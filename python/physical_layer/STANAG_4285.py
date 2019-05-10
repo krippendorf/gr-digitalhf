@@ -2,6 +2,9 @@
 
 import numpy as np
 
+import common
+from digitalhf.digitalhf_swig import viterbi27
+
 class Deinterleaver(object):
     "S4285 deinterleaver"
     def __init__(self, incr):
@@ -18,17 +21,29 @@ class Deinterleaver(object):
     def fetch(self):
         return np.array([self._buf[(9*i)%32][0] for i in range(32)])
 
+
+MODE_BPSK=0
+MODE_QPSK=1
+MODE_8PSK=2
+
+MODES = { ## [BPS]['const'] [BPS]['punct'] [BPS]['repeat']
+    '2400': {'const': MODE_8PSK, 'punct': ['11', '10'] , 'repeat': 1},
+    '1200': {'const': MODE_QPSK, 'punct': [ '1',  '1'] , 'repeat': 1},
+     '600': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 1},
+     '300': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 2},
+     '150': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 4},
+      '75': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 8}
+}
+
+DEINTERLEAVER_INCR = { 'S': 1, 'L': 12 }
+
 class PhysicalLayer(object):
     """Physical layer description for STANAG 4285"""
-
-    MODE_BPSK=0
-    MODE_QPSK=1
-    MODE_8PSK=2
 
     def __init__(self, sps):
         """intialization"""
         self._sps     = sps
-        self._mode    = self.MODE_QPSK
+        ##self._mode    = self.MODE_QPSK
         self._frame_counter = 0
         self._is_first_frame = True
         self._constellations = [self.make_psk(2, [0,1]),
@@ -36,12 +51,16 @@ class PhysicalLayer(object):
                                 self.make_psk(8, [1,0,2,3,6,7,5,4])]
         self._preamble = self.get_preamble()
         self._data     = self.get_data()
-        self._deinterleaver = Deinterleaver(12) ## for now BPSK L fixed
+        self._viterbi_decoder = viterbi27(0x6d, 0x4f)
 
     def set_mode(self, mode):
-        """set phase modultation type"""
+        """set phase modultation type: 'BPS/S' or 'BPS/L'"""
         print('set_mode', mode)
-        self._mode = int(mode)
+        bps,intl = mode.split('/')
+        self._mode          = MODES[bps]['const']
+        self._deinterleaver = Deinterleaver(DEINTERLEAVER_INCR[intl])
+        self._depuncturer   = common.Depuncturer(repeat           = MODES[bps]['repeat'],
+                                                 puncture_pattern = MODES[bps]['punct'])
 
     def get_constellations(self):
         return self._constellations
@@ -58,7 +77,7 @@ class PhysicalLayer(object):
 
         success,frame_description = True,[]
         if (self._frame_counter%2) == 0:
-            frame_description = [self._preamble,self.MODE_BPSK,success,False]
+            frame_description = [self._preamble,MODE_BPSK,success,False]
         else:
             idx = range(30,80)
             z = symbols[idx]*np.conj(self._preamble['symb'][idx])
@@ -106,13 +125,16 @@ class PhysicalLayer(object):
         return 2,np.array([z for z in a['symb'][0:31] for _ in range(self._sps)])
 
     def decode_soft_dec(self, soft_dec):
-        assert(len(soft_dec) == 128)
-        print('decode_soft_dec: ', len(soft_dec))
-        res = []
-        for i in range(0,128,32):
+        n = len(soft_dec)
+        r = []
+        for i in range(0,n,32):
             self._deinterleaver.push(soft_dec[i:i+32])
-            res.extend(self._deinterleaver.fetch().tolist())
-        return res
+            r.extend(self._deinterleaver.fetch().tolist())
+        rd = self._depuncturer.process(np.array(r, dtype=np.float32))
+        decoded_bits = self._viterbi_decoder.udpate(rd)
+        print('bits=', decoded_bits)
+        print('quality={}%'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))))
+        return decoded_bits
 
     @staticmethod
     def get_preamble():

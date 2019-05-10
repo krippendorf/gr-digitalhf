@@ -3,6 +3,7 @@
 from __future__ import print_function
 import numpy as np
 import common
+from digitalhf.digitalhf_swig import viterbi27
 
 ## ---- Walsh-4 codes -----------------------------------------------------------
 WALSH = np.array([[0,0,0,0, 0,0,0,0],  # 0 - 000
@@ -75,26 +76,26 @@ MODE_8PSK=2
 
 ## ---- mode definitions --------------------------------------------------------
 MODE = [[{} for _ in range(8)] for _  in range(8)]
-MODE[7][6] = {'bit_rate':4800, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': -1 }
-MODE[7][7] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate':1./2}
+MODE[7][6] = {'bit_rate':4800, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': 'n/a', 'repeat': 1}
+MODE[7][7] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
-MODE[6][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate':1./2}
-MODE[4][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['L', 40,576], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate':1./2}
+MODE[6][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
+MODE[4][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['L', 40,576], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
-MODE[6][5] = {'bit_rate':1200, 'ci':MODE_QPSK, 'interleaver':['S', 40, 36], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./2}
-MODE[4][5] = {'bit_rate':1200, 'ci':MODE_QPSK, 'interleaver':['L', 40,288], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./2}
+MODE[6][5] = {'bit_rate':1200, 'ci':MODE_QPSK, 'interleaver':['S', 40, 36], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
+MODE[4][5] = {'bit_rate':1200, 'ci':MODE_QPSK, 'interleaver':['L', 40,288], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
-MODE[6][6] = {'bit_rate': 600, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./2}
-MODE[4][6] = {'bit_rate': 600, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./2}
+MODE[6][6] = {'bit_rate': 600, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
+MODE[4][6] = {'bit_rate': 600, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
-MODE[6][7] = {'bit_rate': 300, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./4}
-MODE[4][7] = {'bit_rate': 300, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./4}
+MODE[6][7] = {'bit_rate': 300, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/4', 'repeat': 2}
+MODE[4][7] = {'bit_rate': 300, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/4', 'repeat': 2}
 
-MODE[7][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./8}
-MODE[5][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate':1./8}
+MODE[7][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/8', 'repeat': 4}
+MODE[5][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/8', 'repeat': 4}
 
-MODE[7][5] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['S', 10,  9], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate':1./2}
-MODE[5][4] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['L', 20, 36], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate':1./2}
+MODE[7][5] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['S', 10,  9], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
+MODE[5][4] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['L', 20, 36], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
 
 ## ---- deinterleaver -----------------------------------------------------------
 
@@ -172,7 +173,7 @@ class PhysicalLayer(object):
                     return [self.get_next_data_frame(success),self._mode['ci'],success,success]
         else: ## data mode
             self._frame_counter += 1
-            print('test:', symbols[self._mode['unknown']:], np.mean(np.real(symbols[self._mode['unknown']:])))
+            ##print('test:', symbols[self._mode['unknown']:], np.mean(np.real(symbols[self._mode['unknown']:])))
             if self._frame_counter < self._num_frames_per_block-2:
                 success = np.mean(np.real(symbols[self._mode['unknown']:])) > 0.7
             return [self.get_next_data_frame(success),self._mode['ci'],success,success]
@@ -205,8 +206,9 @@ class PhysicalLayer(object):
                              for _ in range(sps)], dtype=np.complex64)
             ## find starting point
             _,_zp = self.get_preamble_z()
-            cc   = np.correlate(iq_samples, _zp) ##zp[0:3*32*sps])
+            cc   = np.correlate(iq_samples, zp[0:3*32*sps])
             imax = np.argmax(np.abs(cc[0:2*32*sps]))
+            print('imax=', imax, len(iq_samples), len(cc))
             apks = np.abs(cc[(imax, imax+3*32*sps),])
             tpks = np.abs(cc[imax+3*16*sps:imax+5*16*sps])
             print('imax=', imax, 'apks=',apks,
@@ -232,12 +234,14 @@ class PhysicalLayer(object):
         print('data=',data)
         self._pre_counter = sum([(x&3)*(1<<2*y) for (x,y) in zip(data[11:14][::-1], range(3))])
         self._d1d2 = data[9:11]
-        self._mode = MODE[data[9]][data[10]]
-        self._block_len = 11520 if self._mode['interleaver'][0] == 'L' else 1440
-        self._frame_len = self._mode['known'] + self._mode['unknown']
+        self._mode = mode = MODE[data[9]][data[10]]
+        self._block_len = 11520 if mode['interleaver'][0] == 'L' else 1440
+        self._frame_len = mode['known'] + mode['unknown']
         self._num_frames_per_block = self._block_len/self._frame_len;
-        self._deinterleaver = Deinterleaver(self._mode['interleaver'][1], self._mode['interleaver'][2])
-        print(self._d1d2, self._mode, self._frame_len)
+        self._deinterleaver = Deinterleaver(mode['interleaver'][1], mode['interleaver'][2])
+        self._depuncturer   = common.Depuncturer(repeat=mode['repeat'])
+        self._viterbi_decoder = viterbi27(0x6d, 0x4f)
+        print(self._d1d2, mode, self._frame_len)
         return True
 
     def set_mode(self, _):
@@ -247,10 +251,17 @@ class PhysicalLayer(object):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
         r = self._deinterleaver.load(soft_dec)
         print('decode_soft_dec r=', r.shape)
-        if r.shape[0] != 0:
-            for i in range(r.shape[0]//4):
-                print('BB:', r[4*i]<0, r[4*i+2]<0, '|', r[4*i+1]<0, r[4*i+3]<0)
-        return soft_dec ## TODO
+        if r.shape[0] == 0:
+            return []
+        ##for i in range(r.shape[0]//4):
+        ##    print('BB:', r[4*i]<0, r[4*i+2]<0, '|', r[4*i+1]<0, r[4*i+3]<0)
+
+        rd = self._depuncturer.process(r)
+        self._viterbi_decoder.reset()
+        decoded_bits = self._viterbi_decoder.udpate(rd)
+        print('bits=', decoded_bits)
+        print('quality={}%'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))))
+        return decoded_bits
 
     @staticmethod
     def get_preamble():

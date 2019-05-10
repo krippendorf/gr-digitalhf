@@ -437,7 +437,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(426, 368)</value>
+      <value>(426, 442)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -454,6 +454,57 @@
     <param>
       <key>minoutbuf</key>
       <value>0</value>
+    </param>
+    <param>
+      <key>vlen</key>
+      <value>1</value>
+    </param>
+  </block>
+  <block>
+    <key>blocks_file_sink</key>
+    <param>
+      <key>append</key>
+      <value>False</value>
+    </param>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>file</key>
+      <value>/Users/chm/Software/gr-digitalhf/examples/test_bits.bin</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(149, 293)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>180</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>blocks_file_sink_0</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>byte</value>
+    </param>
+    <param>
+      <key>unbuffered</key>
+      <value>True</value>
     </param>
     <param>
       <key>vlen</key>
@@ -527,7 +578,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(714, 261)</value>
+      <value>(704, 261)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -548,6 +599,53 @@
     <param>
       <key>vlen</key>
       <value>(1+(nB+nF)*sps)</value>
+    </param>
+  </block>
+  <block>
+    <key>blocks_pdu_to_tagged_stream</key>
+    <param>
+      <key>alias</key>
+      <value></value>
+    </param>
+    <param>
+      <key>comment</key>
+      <value></value>
+    </param>
+    <param>
+      <key>affinity</key>
+      <value></value>
+    </param>
+    <param>
+      <key>_enabled</key>
+      <value>1</value>
+    </param>
+    <param>
+      <key>_coordinate</key>
+      <value>(405, 304)</value>
+    </param>
+    <param>
+      <key>_rotation</key>
+      <value>180</value>
+    </param>
+    <param>
+      <key>id</key>
+      <value>blocks_pdu_to_tagged_stream_0</value>
+    </param>
+    <param>
+      <key>type</key>
+      <value>byte</value>
+    </param>
+    <param>
+      <key>tag</key>
+      <value>packet_len</value>
+    </param>
+    <param>
+      <key>maxoutbuf</key>
+      <value>0</value>
+    </param>
+    <param>
+      <key>minoutbuf</key>
+      <value>0</value>
     </param>
   </block>
   <block>
@@ -708,7 +806,7 @@
     </param>
     <param>
       <key>repeat</key>
-      <value>True</value>
+      <value>False</value>
     </param>
   </block>
   <block>
@@ -735,7 +833,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(661, 325)</value>
+      <value>(704, 346)</value>
     </param>
     <param>
       <key>_rotation</key>
@@ -814,7 +912,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(394, 464)</value>
+      <value>(352, 528)</value>
     </param>
     <param>
       <key>gui_hint</key>
@@ -1169,7 +1267,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(181, 357)</value>
+      <value>(181, 432)</value>
     </param>
     <param>
       <key>gui_hint</key>
@@ -1536,7 +1634,7 @@
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(426, 293)</value>
+      <value>(448, 368)</value>
     </param>
     <param>
       <key>gui_hint</key>
@@ -1840,7 +1938,7 @@
     </param>
     <param>
       <key>tr_tag</key>
-      <value>"soft_dec"</value>
+      <value>"packet_len"</value>
     </param>
     <param>
       <key>type</key>
@@ -2109,6 +2207,12 @@
     <sink_key>0</sink_key>
   </connection>
   <connection>
+    <source_block_id>blocks_pdu_to_tagged_stream_0</source_block_id>
+    <sink_block_id>blocks_file_sink_0</sink_block_id>
+    <source_key>0</source_key>
+    <sink_key>0</sink_key>
+  </connection>
+  <connection>
     <source_block_id>blocks_throttle_0</source_block_id>
     <sink_block_id>digitalhf_physical_layer_driver_0</sink_block_id>
     <source_key>0</source_key>
@@ -2131,6 +2235,12 @@
     <sink_block_id>blocks_float_to_complex_0</sink_block_id>
     <source_key>1</source_key>
     <sink_key>1</sink_key>
+  </connection>
+  <connection>
+    <source_block_id>digitalhf_physical_layer_driver_0</source_block_id>
+    <sink_block_id>blocks_pdu_to_tagged_stream_0</sink_block_id>
+    <source_key>bits</source_key>
+    <sink_key>pdus</sink_key>
   </connection>
   <connection>
     <source_block_id>digitalhf_physical_layer_driver_0</source_block_id>

@@ -3,11 +3,12 @@
 from __future__ import print_function
 import numpy as np
 import common
+from digitalhf.digitalhf_swig import viterbi27, viterbi29
 
 ## ---- constellations ---------------------------------------------------------
 BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), common.CONST_DTYPE)
 QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), common.CONST_DTYPE)
-PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [1,0,2,3,6,7,5,4]), common.CONST_DTYPE)
+PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [1,0,2,3,7,6,4,5]), common.CONST_DTYPE)
 QAM16=np.array(
     zip([+0.866025+0.500000j, +0.500000+0.866025j, +1.000000+0.000000j, +0.258819+0.258819j,
          -0.500000+0.866025j, +0.000000+1.000000j, -0.866025+0.500000j, -0.258819+0.258819j,
@@ -580,7 +581,7 @@ CODE_RATE_PUNCT = { # [code rate][K] -> punct pattern, [code rate]['Rep'] -> # r
     '5/6' : { 'K=7': [    '11010',    '10101'], 'K=9': [    '10110',    '11001'], 'Rep': 1 },
     '4/5' : { 'K=7': [     '1111',     '1000'], 'K=9': [     '1101',     '1010'], 'Rep': 1 },
     '3/4' : { 'K=7': [      '110',      '101'], 'K=9': [      '111',      '100'], 'Rep': 1 },
-    '2/3' : { 'K=7': [       '11',       '10'], 'K=9': [      '11',        '10'], 'Rep': 1 },
+    '2/3' : { 'K=7': [       '11',       '10'], 'K=9': [       '11',       '10'], 'Rep': 1 },
     '4/7' : { 'K=7': [     '1111',     '0111'], 'K=9': [     '1111',     '0111'], 'Rep': 1 },
     '9/16': { 'K=7': ['111101111','111111011'], 'K=9': ['111101111','111111011'], 'Rep': 1 },
     '1/2' : { 'K=7': [        '1',        '1'], 'K=9': [        '1',        '1'], 'Rep': 1 },
@@ -593,6 +594,28 @@ CODE_RATE_PUNCT = { # [code rate][K] -> punct pattern, [code rate]['Rep'] -> # r
     '1/12': { 'K=7': [        '1',        '1'], 'K=9': [        '1',        '1'], 'Rep': 6 },
     '1/16': { 'K=7': [        '1',        '1'], 'K=9': [        '1',        '1'], 'Rep': 8 }
 }
+
+## ---- deinterleaver -----------------------------------------------------------
+class Deinterleaver(object):
+    """deinterleave"""
+    def __init__(self, length, incr):
+        self._length = length
+        self._array  = np.zeros(length, dtype=np.float32)
+        self._incr   = incr
+        self._idx    = np.mod(incr*np.arange(length), length)
+        self._i      = 0
+
+    def fetch(self):
+        self._i = 0
+        return self._array[self._idx]
+
+    def load(self, a):
+        print('deinterleaver load', len(a), self._i, self._incr, self._length)
+        input_len = len(a)
+        assert(self._i+input_len <= self._length)
+        self._array[self._i:self._i+input_len] = a
+        self._i += input_len
+        return (self._i == self._length)
 
 ## ---- Walsh-4 codes ----------------------------------------------------------
 WALSH = np.array([[0,0,0,0],  # 0 - 00
@@ -806,18 +829,26 @@ class PhysicalLayer(object):
         b = np.flip(b)
         self._wid         = np.packbits(b[0:4])[0]>>4
         self._intl_type   = INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
-        self._constraint_length = b[6]
+        self._constraint_length = 'K=7' if b[6] == 0 else 'K=9'
         self._data_mode   = WID_MODE[self._wid]
         self._unknown     = BW_UNKNOWN[self._bw][self._wid]
         self._known       = BW_KNOWN[self._bw][self._wid]
         mp_info = MP_LEN_BASE_SHIFT[self._known]
         self._mp          = make_mp(self._known, mp_info['base_len'], 0)
         self._mp_shifted  = make_mp(self._known, mp_info['base_len'], mp_info['base_shift'])
-        self._intl_info   = BW_INTL[self._bw][self._wid][self._intl_type]
-        self._intl_incr   = BW_INTL_INCR[self._bw][self._wid][self._intl_type]
-        self._intl_frames = self._intl_info[0]
-        self._intl_bits   = self._intl_info[1]
-        print('b=', b, success, self._wid, self._intl_type, self._intl_frames, self._intl_incr, self._constraint_length,
+        intl_info         = BW_INTL[self._bw][self._wid][self._intl_type]
+        self._intl_frames = intl_info[0]
+
+        code_rate = BW_CODE_RATE[self._bw][self._wid]
+        punct     = CODE_RATE_PUNCT[code_rate]
+
+        self._deinterleaver   = Deinterleaver(length = intl_info[1],
+                                              incr   = BW_INTL_INCR[self._bw][self._wid][self._intl_type])
+        self._depuncturer     = common.Depuncturer(repeat           = punct['Rep'],
+                                                   puncture_pattern = punct[self._constraint_length])
+        self._viterbi_decoder = viterbi27(0x6d, 0x4f) if self._constraint_length == 'K=7' else viterbi29()
+
+        print('b=', b, success, self._wid, self._intl_type, self._intl_frames, self._constraint_length,
               self._known, self._unknown)
         return success
 
@@ -851,9 +882,19 @@ class PhysicalLayer(object):
 
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
-        return soft_dec ## TODO
+        is_full = self._deinterleaver.load(soft_dec)
+        if not is_full:
+            return []
 
-    def get_preamble():
+        r  = self._deinterleaver.fetch()
+        rd = self._depuncturer.process(r)
+        self._viterbi_decoder.reset()
+        decoded_bits = self._viterbi_decoder.udpate(rd)
+        print('quality={}% num_bits={}'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
+                                               len(decoded_bits)))
+        return decoded_bits
+
+    def get_preamble(self):
         """fixed symbols + scrambler"""
         return self._fixed_s
 
@@ -865,9 +906,9 @@ class PhysicalLayer(object):
 if __name__ == '__main__':
     p = PhysicalLayer(5)
     p.set_mode('24 kHz')
-    s = ScrambleData(3)
-    for i in range(10):
-        print(i, s.next())
-    print(np.real(make_mp(24,13,0)))
-    print(np.real(make_mp(24,13,6)))
-    #print(make_mp(72,36,0))
+    #s = ScrambleData(3)
+    #for i in range(10):
+    #    print(i, s.next())
+    #    print(np.real(make_mp(24,13,0)))
+    #    print(np.real(make_mp(24,13,6)))
+    print(mp_base(196))
