@@ -865,9 +865,9 @@ class PhysicalLayer(object):
         CNT_SYMB = np.zeros(4*wlen, dtype=np.complex64)
         WID_SYMB = np.zeros(5*wlen, dtype=np.complex64)
         ## ---- preamble scramble symbols ------------------------------------------------
-        SYNC_SCR  = common.n_psk(8, np.concatenate([FIXED_PN for _ in range(9)]))
-        CNT_SCR   = common.n_psk(8, np.concatenate([CNT_PN   for _ in range(4)]))
-        WID_SCR   = common.n_psk(8, np.concatenate([WID_PN   for _ in range(5)]))
+        SYNC_SCR  = common.n_psk(8, np.concatenate([FIXED_PN for _ in range(9)]))[:len(SYNC_SYMB)]
+        CNT_SCR   = common.n_psk(8, np.concatenate([CNT_PN   for _ in range(4)]))[:len(CNT_SYMB)]
+        WID_SCR   = common.n_psk(8, np.concatenate([WID_PN   for _ in range(5)]))[:len(WID_SYMB)]
 
         self._fixed_s = np.array(zip(SYNC_SCR*SYNC_SYMB,
                                      SYNC_SCR),
