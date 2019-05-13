@@ -5,25 +5,36 @@ import numpy as np
 import common
 from digitalhf.digitalhf_swig import viterbi27
 
-## ---- Walsh-4 codes -----------------------------------------------------------
-WALSH = np.array([[0,0,0,0, 0,0,0,0],  # 0 - 000
-                  [0,1,0,1, 0,1,0,1],  # 1 - 001
-                  [0,0,1,1, 0,0,1,1],  # 2 - 010
-                  [0,1,1,0, 0,1,1,0],  # 3 - 011
-                  [0,0,0,0, 1,1,1,1],  # 4 - 100
-                  [0,1,0,1, 1,0,1,0],  # 5 - 010
-                  [0,0,1,1, 1,1,0,0],  # 6 - 011
-                  [0,1,1,0, 1,0,0,1]], # 7 - 111
-                 dtype=np.uint8)
+## ---- Walsh-8 codes -----------------------------------------------------------
+WALSH8 = np.array([[0,0,0,0, 0,0,0,0],  # 0 - 000
+                   [0,1,0,1, 0,1,0,1],  # 1 - 001
+                   [0,0,1,1, 0,0,1,1],  # 2 - 010
+                   [0,1,1,0, 0,1,1,0],  # 3 - 011
+                   [0,0,0,0, 1,1,1,1],  # 4 - 100
+                   [0,1,0,1, 1,0,1,0],  # 5 - 010
+                   [0,0,1,1, 1,1,0,0],  # 6 - 011
+                   [0,1,1,0, 1,0,0,1]], # 7 - 111
+                  dtype=np.uint8)
 
-FROM_WALSH = -np.ones(256, dtype=np.int8)
+FROM_WALSH8 = -np.ones(256, dtype=np.int8)
 for i in range(8):
-    FROM_WALSH[np.packbits(WALSH[i][:])[0]] = i
+    FROM_WALSH8[np.packbits(WALSH8[i][:])[0]] = i
+
+## ---- Walsh-4 codes -----------------------------------------------------------
+WALSH4 = np.array([[0,0,0,0],  # 0 - 00
+                   [0,1,0,1],  # 1 - 01
+                   [0,1,1,0],  # 3 - 11 modified gray coding!
+                   [0,0,1,1]], # 2 - 10 modified gray coding!
+                  dtype=np.uint8)
+
+FROM_WALSH4 = -np.ones(256, dtype=np.int8)
+for i in range(4):
+    FROM_WALSH4[np.packbits(WALSH4[i][:])[0]] = i
 
 ## ---- tri-bit codes -----------------------------------------------------------
 TRIBIT = np.zeros((8,32), dtype=np.uint8)
 for i in range(8):
-    TRIBIT[i][:] = np.concatenate([WALSH[i][:] for j in range(4)])
+    TRIBIT[i][:] = np.concatenate([WALSH8[i][:] for j in range(4)])
 
 ## ---- tri-bit scramble sequence for preamble ----------------------------------
 TRIBIT_SCRAMBLE = np.array(
@@ -93,9 +104,9 @@ MODE[4][7] = {'bit_rate': 300, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unk
 
 MODE[7][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/8', 'repeat': 4}
 MODE[5][4] = {'bit_rate': 150, 'ci':MODE_BPSK, 'interleaver':['L', 40,144], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/8', 'repeat': 4}
-
-MODE[7][5] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['S', 10,  9], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
-MODE[5][4] = {'bit_rate':  75, 'ci':MODE_QPSK, 'interleaver':['L', 20, 36], 'unknown':-1,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
+## 75 bps othogonal WALSH modulation
+MODE[7][5] = {'bit_rate':  75, 'ci':MODE_BPSK, 'interleaver':['S', 10,  9], 'unknown':160,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
+MODE[5][5] = {'bit_rate':  75, 'ci':MODE_BPSK, 'interleaver':['L', 20, 36], 'unknown':160,'known': 0, 'nsymb':32, 'coding_rate': '1/2', 'repeat': 1}
 
 ## ---- deinterleaver -----------------------------------------------------------
 
@@ -174,7 +185,12 @@ class PhysicalLayer(object):
         else: ## data mode
             self._frame_counter += 1
             ##print('test:', symbols[self._mode['unknown']:], np.mean(np.real(symbols[self._mode['unknown']:])))
-            if self._frame_counter < self._num_frames_per_block-2:
+            if self._mode['known'] == 0: ## orthogonal WALSH modulation
+                success = True
+                for i in range(5):
+                    a = symbols[32*i:32*(i+1)]
+                    success &= np.max(np.imag(np.mean(a.reshape(8,4),0))) < 0.25
+            elif self._frame_counter < self._num_frames_per_block-2:
                 success = np.mean(np.real(symbols[self._mode['unknown']:])) > 0.7
             return [self.get_next_data_frame(success),self._mode['ci'],success,success]
 
@@ -188,10 +204,10 @@ class PhysicalLayer(object):
                      common.SYMB_SCRAMBLE_DTYPE)
         n_unknown = self._mode['unknown']
         a['symb'][0:n_unknown] = 0
-        if self._frame_counter >= self._num_frames_per_block-2:
+        if self._mode['known'] != 0 and self._frame_counter >= self._num_frames_per_block-2:
             idx_d1d2 = self._frame_counter - self._num_frames_per_block + 2;
-            a['symb'][n_unknown  :n_unknown+ 8] *= common.n_psk(2, WALSH[self._d1d2[idx_d1d2]][:])
-            a['symb'][n_unknown+8:n_unknown+16] *= common.n_psk(2, WALSH[self._d1d2[idx_d1d2]][:])
+            a['symb'][n_unknown  :n_unknown+ 8] *= common.n_psk(2, WALSH8[self._d1d2[idx_d1d2]][:])
+            a['symb'][n_unknown+8:n_unknown+16] *= common.n_psk(2, WALSH8[self._d1d2[idx_d1d2]][:])
         if not success:
             self._frame_counter = -1
             self._pre_counter = -1
@@ -226,10 +242,10 @@ class PhysicalLayer(object):
         return success,doppler
 
     def decode_preamble(self, symbols):
-        data = [FROM_WALSH[np.packbits
-                           (np.real
-                            (np.sum
-                             (symbols[i:i+32].reshape((4,8)),0))<0)[0]]
+        data = [FROM_WALSH8[np.packbits
+                            (np.real
+                             (np.sum
+                              (symbols[i:i+32].reshape((4,8)),0))<0)[0]]
                 for i in range(0,15*32,32)]
         print('data=',data)
         self._pre_counter = sum([(x&3)*(1<<2*y) for (x,y) in zip(data[11:14][::-1], range(3))])
@@ -237,7 +253,10 @@ class PhysicalLayer(object):
         self._mode = mode = MODE[data[9]][data[10]]
         self._block_len = 11520 if mode['interleaver'][0] == 'L' else 1440
         self._frame_len = mode['known'] + mode['unknown']
-        self._num_frames_per_block = self._block_len/self._frame_len;
+        if mode['known'] == 0: ## orthogonal WALSH modulation
+            self._num_frames_per_block = mode['interleaver'][1]*mode['interleaver'][2]/2*32/160
+        else:
+            self._num_frames_per_block = self._block_len/self._frame_len
         self._deinterleaver = Deinterleaver(mode['interleaver'][1], mode['interleaver'][2])
         self._depuncturer   = common.Depuncturer(repeat=mode['repeat'])
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
@@ -249,13 +268,24 @@ class PhysicalLayer(object):
 
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
-        r = self._deinterleaver.load(soft_dec)
+        if self._mode['known'] == 0: ## orthogonal WALSH modulation
+            n = len(soft_dec) // 32
+            soft_bits = np.zeros(2*n, dtype=np.float32)
+            for i in range(n):
+                w = np.sum(soft_dec[32*i:32*(i+1)].reshape(4,8),0)
+                b = FROM_WALSH4[np.packbits(w[0:4]>0)[0]]
+                print('WALSH', i, w, b)
+                abs_soft_dec = np.mean(np.abs(w))
+                soft_bits[2*i]   = abs_soft_dec*(2*(b>>1)-1)
+                soft_bits[2*i+1] = abs_soft_dec*(2*(b &1)-1)
+            print('WALSH soft_bits=', soft_bits)
+            r = self._deinterleaver.load(soft_bits)
+        else:
+            r = self._deinterleaver.load(soft_dec)
         print('decode_soft_dec r=', r.shape)
         if r.shape[0] == 0:
             return []
-        ##for i in range(r.shape[0]//4):
-        ##    print('BB:', r[4*i]<0, r[4*i+2]<0, '|', r[4*i+1]<0, r[4*i+3]<0)
-
+        print('deinterleaved bits: ', r>0)
         rd = self._depuncturer.process(r)
         self._viterbi_decoder.reset()
         decoded_bits = self._viterbi_decoder.udpate(rd)
@@ -301,9 +331,9 @@ if __name__ == '__main__':
         print(i, all(z[32*sps*i:32*sps*(i+1)] == z[32*sps*(3+i):32*sps*(3+i+1)]))
 
     #print(np.sum(np.sum(z[0:32*5] * np.conj(z[32*5*3:32*5*4]))))
-    #print(WALSH[1][:])
-    #print(sum(WALSH[1][:]*(1<<np.array(range(7,-1,-1)))))
-    #print(FROM_WALSH)
+    #print(WALSH8[1][:])
+    #print(sum(WALSH8[1][:]*(1<<np.array(range(7,-1,-1)))))
+    #print(FROM_WALSH8)
     #print(gen_data_scramble())
 
     s=ScrambleData()
