@@ -94,7 +94,7 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
   , _num_samples_since_filter_update(0)
   , _rotated_samples()
   , _rotator()
-  , _control_loop(2*M_PI/100, 5e-3, -5e-3)
+  , _control_loop(2*M_PI/100, 5e-5, -5e-5)
 {
   GR_LOG_DECLARE_LOGPTR(d_logger);
   GR_LOG_ASSIGN_LOGPTR(d_logger, "adaptive_dfe");
@@ -287,23 +287,12 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
   // std::cout << "FILTER: " << filter_output <<" " << known_symbol << " " << start[_nB+1] << std::endl;
   // (3) filter update
   if (is_known || update_taps) {
-    // (3a) control loop update for doppler correction using the adaptibve filter taps
-    gr_complex acc(0);
-    for (int j=_nB+1-2*_sps; j<_nB+1+2*_sps+1; ++j)
-      acc += std::conj(_last_taps_samples[j]) * _taps_samples[j];
-    float const frequency_err = gr::fast_atan2f(acc)/_num_samples_since_filter_update; // frequency error (rad/sample)
-    _control_loop.advance_loop(frequency_err);
-    _control_loop.phase_wrap();
-    _control_loop.frequency_limit();
-    _rotator.set_phase_incr(gr_expj(_control_loop.get_frequency()));
-
-    // (3b) update of adaptive filter taps
+    // (3a) update of adaptive filter taps
     gr_complex const err =  filter_output - known_symbol;
     //       taps_samples
     for (int j=0; j<_nB+_nF+1; ++j) {
       _last_taps_samples[j] = _taps_samples[j];
       _taps_samples[j]     -= _mu*err*std::conj(start[j]);
-      _num_samples_since_filter_update = 0;
     }
     //       taps_symbols
     if (_use_symbol_taps) {
@@ -316,6 +305,20 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
         _hist_symbol_index = 0;
     }
   }
+  // (3b) control loop update for doppler correction using the adaptibve filter taps
+  if (_symbol_counter+1 == _symbols.size()) {
+    gr_complex acc(0);
+    for (int j=_nB+1-2*_sps; j<_nB+1+2*_sps+1; ++j)
+      acc += std::conj(_last_taps_samples[j]) * _taps_samples[j];
+    float const frequency_err = gr::fast_atan2f(acc)/(1+0*_num_samples_since_filter_update); // frequency error (rad/sample)
+    std::cout << "frequency_err " << frequency_err << " " << _num_samples_since_filter_update << std::endl;
+    _control_loop.advance_loop(frequency_err);
+    _control_loop.phase_wrap();
+    _control_loop.frequency_limit();
+    _rotator.set_phase_incr(gr_expj(_control_loop.get_frequency()));
+    _num_samples_since_filter_update = 0;
+  }
+
   // (4) save the descrambled symbol (-> frame_info)
   _descrambled_symbols[_symbol_counter] = filter_output*std::conj(_scramble[_symbol_counter]);
   return _descrambled_symbols[_symbol_counter++];
