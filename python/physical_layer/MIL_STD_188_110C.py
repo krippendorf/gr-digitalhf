@@ -2,18 +2,18 @@
 
 from __future__ import print_function
 import numpy as np
-from common import *
+import common
 
 ## ---- constellations -----------------------------------------------------------
-BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), CONST_DTYPE)
-QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), CONST_DTYPE)
-PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,7,6,4,5]), CONST_DTYPE)
+BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), common.CONST_DTYPE)
+QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), common.CONST_DTYPE)
+PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,7,6,4,5]), common.CONST_DTYPE)
 QAM16=np.array(
     zip([+0.866025+0.500000j,  0.500000+0.866025j,  1.000000+0.000000j,  0.258819+0.258819j,
          -0.500000+0.866025j,  0.000000+1.000000j, -0.866025+0.500000j, -0.258819+0.258819j,
          +0.500000-0.866025j,  0.000000-1.000000j,  0.866025-0.500000j,  0.258819-0.258819j,
          -0.866025-0.500000j, -0.500000-0.866025j, -1.000000+0.000000j, -0.258819-0.258819j],
-        range(16)), CONST_DTYPE)
+        range(16)), common.CONST_DTYPE)
 QAM32=np.array(
     zip([+0.866380+0.499386j,  0.984849+0.173415j,  0.499386+0.866380j,  0.173415+0.984849j,
          +0.520246+0.520246j,  0.520246+0.173415j,  0.173415+0.520246j,  0.173415+0.173415j,
@@ -23,7 +23,7 @@ QAM32=np.array(
          +0.520246-0.520246j,  0.520246-0.173415j,  0.173415-0.520246j,  0.173415-0.173415j,
          -0.866380-0.499386j, -0.984849-0.173415j, -0.499386-0.866380j, -0.173415-0.984849j,
          -0.520246-0.520246j, -0.520246-0.173415j, -0.173415-0.520246j, -0.173415-0.173415j],
-        range(32)), CONST_DTYPE)
+        range(32)), common.CONST_DTYPE)
 QAM64=np.array(
     zip([+1.000000+0.000000j,  0.822878+0.568218j,  0.821137+0.152996j,  0.932897+0.360142j,
          +0.000000-1.000000j,  0.822878-0.568218j,  0.821137-0.152996j,  0.932897-0.360142j,
@@ -41,7 +41,7 @@ QAM64=np.array(
          -0.152996-0.821137j, -0.117686-0.588429j, -0.117686-0.117686j, -0.117686-0.353057j,
          -0.360142+0.932897j, -0.353057+0.588429j, -0.353057+0.117686j, -0.353057+0.353057j,
          -0.360142-0.932897j, -0.353057-0.588429j, -0.353057-0.117686j, -0.353057-0.353057j],
-        range(64)), CONST_DTYPE)
+        range(64)), common.CONST_DTYPE)
 
 ## for test
 #QAM64 = QAM64[(7,3,24,56,35,39,60,28),]
@@ -77,7 +77,7 @@ class ScrambleData(object):
 
 ## ---- preamble definitions  ---------------------------------------------------
 ## 184 = 8*23
-PREAMBLE=n_psk(8, np.array(
+PREAMBLE=common.n_psk(8, np.array(
     [1,5,1,3,6,1,3,1,1,6,3,7,7,3,5,4,3,6,6,4,5,4,0,
      2,2,2,6,0,7,5,7,4,0,7,5,7,1,6,1,0,5,2,2,6,2,3,
      6,0,0,5,1,4,2,2,2,3,4,0,6,2,7,4,3,3,7,2,0,2,6,
@@ -88,7 +88,7 @@ PREAMBLE=n_psk(8, np.array(
      2,7,7,5,3,3,6,0,5,3,3,1,0,7,1,1,0,3,0,4,0,7,3]))
 
 ## 103 = 31 + 1 + 3*13 + 1 + 31
-REINSERTED_PREAMBLE=n_psk(8, np.array(
+REINSERTED_PREAMBLE=common.n_psk(8, np.array(
     [0,0,0,0,0,2,4,6,0,4,0,4,0,6,4,2,0,0,0,0,0,2,4,6,0,4,0,4,0,6,4,   ## MP+
      2,
      0,4,0,4,0,0,4,4,0,0,0,0,0, # + D0
@@ -97,8 +97,8 @@ REINSERTED_PREAMBLE=n_psk(8, np.array(
      6,
      4,4,4,4,4,6,0,2,4,0,4,0,4,2,0,6,4,4,4,4,4,6,0,2,4,0,4,0,4,2,0])) ## MP-
 ## length 31
-MINI_PROBE=[n_psk(8, np.array([0,0,0,0,0,2,4,6,0,4,0,4,0,6,4,2,0,0,0,0,0,2,4,6,0,4,0,4,0,6,4])), ## sign = + (0)
-            n_psk(8, np.array([4,4,4,4,4,6,0,2,4,0,4,0,4,2,0,6,4,4,4,4,4,6,0,2,4,0,4,0,4,2,0]))] ## sign = - (1)
+MINI_PROBE=[common.n_psk(8, np.array([0,0,0,0,0,2,4,6,0,4,0,4,0,6,4,2,0,0,0,0,0,2,4,6,0,4,0,4,0,6,4])), ## sign = + (0)
+            common.n_psk(8, np.array([4,4,4,4,4,6,0,2,4,0,4,0,4,2,0,6,4,4,4,4,4,6,0,2,4,0,4,0,4,2,0]))] ## sign = - (1)
 
 ## ---- di-bits ----------------------------------------------------------------
 TO_DIBIT=[(0,0),(0,1),(1,1),(1,0)]
@@ -135,9 +135,10 @@ class PhysicalLayer(object):
     def __init__(self, sps):
         """intialization"""
         self._sps = sps
-        self._frame_counter = -1
+        self._frame_counter = -2
         self._constellations = [BPSK, QPSK, PSK8, QAM16, QAM32, QAM64]
         self._preamble = self.get_preamble()
+        self._interleaver_length = 72 ## set in decode_reinserted preamble to the actual value
 
     def get_constellations(self):
         return self._constellations
@@ -151,19 +152,18 @@ class PhysicalLayer(object):
                 symbols are saved"""
         print('-------------------- get_frame --------------------', self._frame_counter)
         success = True
-        if self._frame_counter == -1: ## ---- preamble
+        if self._frame_counter == -2: ## ---- preamble
             self._preamble_offset = 0
             self._frame_counter += 1
             return [self._preamble,MODE_BPSK,success,False]
 
-        frame_counter_mod72 = self._frame_counter%72
-        if frame_counter_mod72 == 0: ## --- re-inserted preamble
+        if self._frame_counter == -1: ## --- re-inserted preamble
             self._frame_counter += 1
-            success = self.get_preamble_quality(symbols)
+            success = self.get_preamble_quality(symbols) if self._frame_counter < 4 else self.get_data_frame_quality(symbols)
             return [self.make_reinserted_preamble(self._preamble_offset,success),MODE_QPSK,success,False]
 
-        if frame_counter_mod72 >= 1: ## ---- data frames
-            got_reinserted_preamble = frame_counter_mod72 == 1
+        if self._frame_counter >= 0: ## ---- data frames
+            got_reinserted_preamble = self._frame_counter == 0
             self._frame_counter += 1
             if got_reinserted_preamble:
                 success = self.decode_reinserted_preamble(symbols)
@@ -198,7 +198,7 @@ class PhysicalLayer(object):
                 print('doppler ppks', np.angle(pks),
                       np.diff(np.unwrap(np.angle(pks)))/m,
                       np.mean(np.diff(np.unwrap(np.angle(pks)))/m))
-                doppler = freq_est(pks)/m;
+                doppler = common.freq_est(pks)/m;
             print('success=', success, 'doppler=', doppler)
         return success,doppler
 
@@ -206,15 +206,17 @@ class PhysicalLayer(object):
         pass
 
     def get_preamble_quality(self, symbols):
-        return np.abs(np.mean(symbols[-40:])) > 0.5
+        print('get_preamble_quality', np.abs(np.mean(symbols[-32:])), symbols[-32:])
+        return np.abs(np.mean(symbols[-32:])) > 0.5
 
     def get_data_frame_quality(self, symbols):
+        print('get_data_frame_quality', symbols[-31:])
         return np.abs(np.mean(symbols[-31:])) > 0.5
 
     def decode_reinserted_preamble(self, symbols):
         ## decode D0,D1,D2
-        idx    = np.arange(13)
-        z      = np.array([np.mean(symbols[32+13*i+idx]) for i in range(3)])
+        z = np.array([np.mean(symbols[-71+i*13:-71+(i+1)*13]) for i in range(3)])
+        print('decode_reinserted_preamble', symbols[0:-71], symbols[-71:-71+3*13], symbols[-71+4*13:], z)
         d0d1d2 = map(np.uint8, np.mod(np.round(np.angle(z)/np.pi*2),4))
         dibits = [TO_DIBIT[idx] for idx in d0d1d2]
         self._mode = {'rate':        tuple([x[0] for x in dibits]),
@@ -222,6 +224,7 @@ class PhysicalLayer(object):
         print('======== rate,interleaver:',
               TO_RATE[self._mode['rate']],
               TO_INTERLEAVER[self._mode['interleaver']])
+        self._interleaver_length = TO_INTERLEAVER[self._mode['interleaver']]['frames']
         rate_info = TO_RATE[self._mode['rate']]
         print('rate_info', rate_info)
         self._constellation_index = rate_info['ci']
@@ -239,11 +242,11 @@ class PhysicalLayer(object):
     def make_reinserted_preamble(self, offset, success):
         """ offset=  0 -> 1st reinserted preamble
             offset=-72 -> all following reinserted preambles"""
-        print('make_reinserted_preamble', offset, success)
         a=np.array(zip(REINSERTED_PREAMBLE[offset:],
                        REINSERTED_PREAMBLE[offset:]),
                      common.SYMB_SCRAMBLE_DTYPE)
-        a['symb'][-72:-72+3*13] = 0 ## D0,D1,D2
+        a['symb'][-71:-71+3*13] = 0 ## D0,D1,D2
+        print('make_reinserted_preamble', offset, success, len(a['symb']), a['symb'], a['scramble'])
         if not success:
             self._frame_counter = -1
         return a
@@ -252,12 +255,15 @@ class PhysicalLayer(object):
         self._preamble_offset = -72 ## all following reinserted preambles start at index -72
         a = np.zeros(256+31, common.SYMB_SCRAMBLE_DTYPE)
         a['scramble'][:256] = self._data_scramble
-        n = (self._frame_counter-2)%72
+        n = (self._frame_counter-1)%72
+        if self._frame_counter == 72:
+            self._frame_counter = -1
         m = n%18
         if m == 0:
             cnt = n//18
             self._mp = (1,1,1,1,1,1,1,0)+self._mode['rate']+self._mode['interleaver']+MP_COUNTER[cnt]+(0,)
-            print('new mini-probe signs n=',n,'m=',m,self._mp)
+            print('new mini-probe signs n=',n,'m=',m, 'cnt=',cnt, self._mp)
+        print('make_data_frame', m, self._mp[m])
         a['symb'][256:]     = MINI_PROBE[self._mp[m]]
         a['scramble'][256:] = MINI_PROBE[self._mp[m]]
         if not success:
@@ -280,7 +286,7 @@ class PhysicalLayer(object):
 
 if __name__ == '__main__':
     print(PREAMBLE)
-    z = n_psk(8,PREAMBLE)
+    z = common.n_psk(8,PREAMBLE)
     cc = [np.sum(z[0:23]*np.conj(z[23*i:23*i+23])) for i in range(6)]
     print(np.abs(cc))
     print(np.angle(cc)/np.pi*4)
