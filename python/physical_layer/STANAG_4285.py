@@ -27,12 +27,12 @@ MODE_QPSK=1
 MODE_8PSK=2
 
 MODES = { ## [BPS]['const'] [BPS]['punct'] [BPS]['repeat']
-    '2400': {'const': MODE_8PSK, 'punct': ['11', '10'] , 'repeat': 1},
-    '1200': {'const': MODE_QPSK, 'punct': [ '1',  '1'] , 'repeat': 1},
-     '600': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 1},
-     '300': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 2},
-     '150': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 4},
-      '75': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 8}
+    '2400': {'const': MODE_8PSK, 'punct': ['11', '10'] , 'repeat': 1, 'deintl_multiple': 4},
+    '1200': {'const': MODE_QPSK, 'punct': [ '1',  '1'] , 'repeat': 1, 'deintl_multiple': 2},
+     '600': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 1, 'deintl_multiple': 1},
+     '300': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 2, 'deintl_multiple': 1},
+     '150': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 4, 'deintl_multiple': 1},
+      '75': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 8, 'deintl_multiple': 1}
 }
 
 DEINTERLEAVER_INCR = { 'S': 1, 'L': 12 }
@@ -58,7 +58,7 @@ class PhysicalLayer(object):
         print('set_mode', mode)
         bps,intl = mode.split('/')
         self._mode          = MODES[bps]['const']
-        self._deinterleaver = Deinterleaver(DEINTERLEAVER_INCR[intl])
+        self._deinterleaver = Deinterleaver(DEINTERLEAVER_INCR[intl] * MODES[bps]['deintl_multiple'])
         self._depuncturer   = common.Depuncturer(repeat           = MODES[bps]['repeat'],
                                                  puncture_pattern = MODES[bps]['punct'])
 
@@ -173,7 +173,7 @@ class PhysicalLayer(object):
     @staticmethod
     def make_psk(n, gray_code):
         """generates n-PSK constellation data"""
-        c = np.zeros(n, dtype=[('points', np.complex64), ('symbols', np.int32)])
+        c = np.zeros(n, common.CONST_DTYPE)
         c['points']  = np.exp(2*np.pi*1j*np.arange(n)/n)
         c['symbols'] = gray_code
         return c
