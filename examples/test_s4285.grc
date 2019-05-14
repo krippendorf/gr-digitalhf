@@ -164,7 +164,7 @@
     </param>
     <param>
       <key>value</key>
-      <value>'600/L'</value>
+      <value>'1200/L'</value>
     </param>
     <param>
       <key>_enabled</key>
@@ -240,7 +240,7 @@
     </param>
     <param>
       <key>options</key>
-      <value>['2400/L', '1200/L', '600/L', '300/L', '150/L', '75/L']</value>
+      <value>['2400/L', '1200/L', '600/L', '300/L', '150/L', '75/L', '2400/S', '1200/S', '600/S', '300/S', '150/S', '75/S']</value>
     </param>
     <param>
       <key>orient</key>
@@ -877,11 +877,11 @@
     </param>
     <param>
       <key>file</key>
-      <value>/Users/chm/Software/gr-digitalhf/examples/on5kq.ddns.net_2019-03-20T12_49_38Z_2381.40_iq.wav</value>
+      <value>/Users/chm/Downloads/sdr.loginto.me_2019-05-14T13_46_37Z_7938.80_iq.wav</value>
     </param>
     <param>
       <key>_coordinate</key>
-      <value>(10, 154)</value>
+      <value>(21, 154)</value>
     </param>
     <param>
       <key>_rotation</key>

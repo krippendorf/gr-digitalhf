@@ -6,7 +6,19 @@ CONST_DTYPE=np.dtype([('points',  np.complex64),
                       ('symbols', np.int32)])
 
 SYMB_SCRAMBLE_DTYPE=np.dtype([('symb',     np.complex64),
-                              ('scramble', np.complex64)])
+                              ('scramble', np.complex64),
+                              ('scramble_xor', np.uint8)])
+
+def make_scr(s1, s2=None, s3=None):
+    a = np.zeros(len(s1), SYMB_SCRAMBLE_DTYPE)
+    a['symb'][:] = s1
+    if s2 is not None:
+        assert(len(s2) == len(s1))
+        a['scramble'][:] = s2
+    if s3 is not None:
+        assert(len(s3) == len(s1))
+        a['scramble_xor'][:] = s3
+    return a
 
 def n_psk(n,x):
     """n-ary PSK constellation"""

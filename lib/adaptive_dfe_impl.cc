@@ -83,6 +83,7 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
   , _constellation_index()
   , _symbols()
   , _scramble()
+  , _scramble_xor()
   , _descrambled_symbols()
   , _symbol_counter(0)
   , _save_soft_decisions(false)
@@ -280,7 +281,12 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
       float const err = std::abs(descrambled_filter_output - descrambled_symbol);
       std::vector<float> const soft_dec = constell->calc_soft_dec
         (descrambled_filter_output, _npwr[_constellation_index].filter(err));
-      std::copy(soft_dec.begin(), soft_dec.end(), std::back_inserter<std::vector<float> >(_vec_soft_decisions));
+      // std::cout << "SD: " << descrambled_filter_output << " : ";
+      for (int j=0, m=soft_dec.size(); j<m; ++j) {
+        _vec_soft_decisions.push_back(soft_dec[j] * _scramble_xor[_symbol_counter][j]);
+        // std::cout << " " << _vec_soft_decisions.back();
+      }
+      // std::cout << std::endl;
     }
     known_symbol = _scramble[_symbol_counter] * descrambled_symbol;
   }
@@ -289,6 +295,8 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
   if (is_known || update_taps) {
     // (3a) update of adaptive filter taps
     gr_complex const err =  filter_output - known_symbol;
+    if (std::abs(err)>0.5)
+      std::cout << "err= " << std::abs(err) << std::endl;
     //       taps_samples
     for (int j=0; j<_nB+_nF+1; ++j) {
       _last_taps_samples[j] = _taps_samples[j];
@@ -311,7 +319,7 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
     for (int j=_nB+1-2*_sps; j<_nB+1+2*_sps+1; ++j)
       acc += std::conj(_last_taps_samples[j]) * _taps_samples[j];
     float const frequency_err = gr::fast_atan2f(acc)/(1+0*_num_samples_since_filter_update); // frequency error (rad/sample)
-    std::cout << "frequency_err " << frequency_err << " " << _num_samples_since_filter_update << std::endl;
+    GR_LOG_DEBUG(d_logger, str(boost::format("frequency_err= %f %d") % frequency_err % _num_samples_since_filter_update));
     _control_loop.advance_loop(frequency_err);
     _control_loop.phase_wrap();
     _control_loop.frequency_limit();
@@ -390,8 +398,7 @@ void adaptive_dfe_impl::update_constellations(pmt::pmt_t data) {
   int const n = pmt::length(data);
   _constellations.resize(n);
   _npwr.resize(n);
-  std::cout << "adaptive_dfe_impl::update_constellations " << data << std::endl;
-  std::cout << "adaptive_dfe_impl::update_constellations n=" << n << std::endl;
+  GR_LOG_DEBUG(d_logger, str(boost::format("update_constellations %s n=%d") % data % n));
   unsigned int const rotational_symmetry = 0;
   unsigned int const dimensionality = 1;
 
@@ -415,6 +422,18 @@ void adaptive_dfe_impl::update_frame_info(pmt::pmt_t data)
   _constellation_index   = pmt::to_long(pmt::dict_ref(data, pmt::intern("constellation_idx"), pmt::PMT_NIL));
   _save_soft_decisions   = pmt::to_bool(pmt::dict_ref(data, pmt::intern("save_soft_dec"),     pmt::PMT_F));
   bool const do_continue = pmt::to_bool(pmt::dict_ref(data, pmt::intern("do_continue"),       pmt::PMT_F));
+
+  // make table +-1
+  std::vector<std::uint8_t> const scr_xor = pmt::u8vector_elements(pmt::dict_ref(data, pmt::intern("scramble_xor"), pmt::PMT_NIL));
+  _scramble_xor.resize(scr_xor.size());
+  gr::digital::constellation_sptr constell = _constellations[_constellation_index];
+  for (int i=0, n=scr_xor.size(); i<n; ++i) {
+    for (int j=0, m=constell->bits_per_symbol(); j<m; ++j) {
+      _scramble_xor[i][m-j-1] = 1 - 2*bool(scr_xor[i] & (1<<j));
+      // GR_LOG_DEBUG(d_logger, str(boost::format("XOR %3d %3d %d") % i % j % _scramble_xor[i][j]));
+    }
+  }
+
   assert(_symbols.size() == _scramble.size());
   _descrambled_symbols.resize(_symbols.size());
   _vec_soft_decisions.clear();

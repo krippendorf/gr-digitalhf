@@ -80,9 +80,10 @@ private:
   std::vector<constellation_distance_filter> _npwr;
   int _npwr_max_time_constant;
   int _constellation_index;
-  std::vector<gr_complex> _symbols;
-  std::vector<gr_complex> _scramble;
-  std::vector<gr_complex> _descrambled_symbols;
+  std::vector<gr_complex>   _symbols;
+  std::vector<gr_complex>   _scramble; // PSK-8 scramble symbols
+  std::vector<std::array<int,8> > _scramble_xor; // signs for XOR scrambling
+  std::vector<gr_complex>   _descrambled_symbols;
   int _symbol_counter;
 
   bool _save_soft_decisions;

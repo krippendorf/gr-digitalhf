@@ -772,9 +772,14 @@ class PhysicalLayer(object):
         else:
             self._state = 'MP'
             a = np.zeros(self._unknown, common.SYMB_SCRAMBLE_DTYPE)
+            a['scramble'][:] = 1
             self._scr_data.reset()
-            for i in range(self._unknown): ## TODO: handle QAM modes
-                a['scramble'][i] = np.exp(2j*np.pi*self._scr_data.next()/8)
+            if self._wid_mode <= MODE_8PSK: ## not QAM
+                for i in range(self._unknown):
+                    a['scramble'][i] = np.exp(2j*np.pi*self._scr_data.next()/8)
+            else: ## QAM modes
+                for i in range(self._unknown):
+                    a['scramble_xor'][i] = self._scr_data.next()
             return self._data_mode,a
 
     def get_doppler(self, iq_samples):
@@ -869,16 +874,12 @@ class PhysicalLayer(object):
         CNT_SCR   = common.n_psk(8, np.concatenate([CNT_PN   for _ in range(4)]))[:len(CNT_SYMB)]
         WID_SCR   = common.n_psk(8, np.concatenate([WID_PN   for _ in range(5)]))[:len(WID_SYMB)]
 
-        self._fixed_s = np.array(zip(SYNC_SCR*SYNC_SYMB,
-                                     SYNC_SCR),
-                                 common.SYMB_SCRAMBLE_DTYPE)
-        self._cnt_s   = np.array(zip(CNT_SCR*CNT_SYMB,
-                                     CNT_SCR),
-                               common.SYMB_SCRAMBLE_DTYPE)
-        self._wid_s   = np.array(zip(WID_SCR*WID_SYMB,
-                                     WID_SCR),
-                                 common.SYMB_SCRAMBLE_DTYPE)
-
+        self._fixed_s = common.make_scr(SYNC_SCR*SYNC_SYMB,
+                                        SYNC_SCR)
+        self._cnt_s   = common.make_scr(CNT_SCR*CNT_SYMB,
+                                        CNT_SCR)
+        self._wid_s   = common.make_scr(WID_SCR*WID_SYMB,
+                                        WID_SCR)
 
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)

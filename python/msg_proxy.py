@@ -74,6 +74,7 @@ class msg_proxy(gr.basic_block):
         msg_out = pmt.make_dict()
         msg_out = pmt.dict_add(msg_out, pmt.intern('symb'), pmt.to_pmt(symb['symb']))
         msg_out = pmt.dict_add(msg_out, pmt.intern('scramble'), pmt.to_pmt(symb['scramble']))
+        msg_out = pmt.dict_add(msg_out, pmt.intern('scramble_xor'), pmt.to_pmt(symb['scramble_xor']))
         msg_out = pmt.dict_add(msg_out, pmt.intern('constellation_idx'), pmt.to_pmt(constellation_idx))
         msg_out = pmt.dict_add(msg_out, pmt.intern('do_continue'), pmt.to_pmt(np.bool(do_continue)))
         msg_out = pmt.dict_add(msg_out, pmt.intern('save_soft_dec'), pmt.to_pmt(np.bool(save_soft_dec)))
