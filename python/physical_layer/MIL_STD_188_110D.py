@@ -618,15 +618,35 @@ class Deinterleaver(object):
         return (self._i == self._length)
 
 ## ---- Walsh-4 codes ----------------------------------------------------------
-WALSH = np.array([[0,0,0,0],  # 0 - 00
-                  [0,1,0,1],  # 1 - 01
-                  [0,0,1,1],  # 2 - 10
-                  [0,1,1,0]], # 3 - 11
-                 dtype=np.uint8)
-
-FROM_WALSH = -np.ones(256, dtype=np.int8)
+WALSH4 = np.array([[0,0,0,0],  # 0 - 00
+                   [0,1,0,1],  # 1 - 01
+                   [0,0,1,1],  # 2 - 10
+                   [0,1,1,0]], # 3 - 11
+                  dtype=np.uint8)
+FROM_WALSH4 = -np.ones(256, dtype=np.int8)
 for i in range(4):
-    FROM_WALSH[np.packbits(WALSH[i][:])[0]] = i
+    FROM_WALSH4[np.packbits(WALSH4[i][:])[0]] = i
+
+WALSH16 = np.array([[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],  #  0 - 0000
+                    [0,1,0,1, 0,1,0,1, 0,1,0,1, 0,1,0,1],  #  1 - 0001
+                    [0,0,1,1, 0,0,1,1, 0,0,1,1, 0,0,1,1],  #  2 - 0010
+                    [0,1,1,0, 0,1,1,0, 0,1,1,0, 0,1,1,0],  #  3 - 0011
+                    [0,0,0,0, 1,1,1,1, 0,0,0,0, 1,1,1,1],  #  4 - 0100
+                    [0,1,0,1, 1,0,1,0, 0,1,0,1, 1,0,1,0],  #  5 - 0101
+                    [0,0,1,1, 1,1,0,0, 0,0,1,1, 1,1,0,0],  #  6 - 0110
+                    [0,1,1,0, 1,0,0,1, 0,1,1,0, 1,0,0,1],  #  7 - 0111
+                    [0,0,0,0, 0,0,0,0, 1,1,1,1, 1,1,1,1],  #  8 - 1000
+                    [0,1,0,1, 0,1,0,1, 1,0,1,0, 1,0,1,0],  #  9 - 1001
+                    [0,0,1,1, 0,0,1,1, 1,1,0,0, 1,1,0,0],  # 10 - 1010
+                    [0,1,1,0, 0,1,1,0, 1,0,0,1, 1,0,0,1],  # 11 - 1011
+                    [0,0,0,0, 1,1,1,1, 1,1,1,1, 0,0,0,0],  # 12 - 1100
+                    [0,1,0,1, 1,0,1,0, 1,0,1,0, 0,1,0,1],  # 13 - 1101
+                    [0,0,1,1, 1,1,0,0, 1,1,0,0, 0,0,1,1],  # 14 - 1110
+                    [0,1,1,0, 1,0,0,1, 1,0,0,1, 0,1,1,0]], # 15 - 1111
+                   dtype=np.uint8)
+FROM_WALSH16 = -np.ones(256, dtype=np.int8)
+for i in range(16):
+    FROM_WALSH16[np.packbits(WALSH16[i][:])[0]] = i
 
 ## ---- band width - Walsh lengths table ---------------------------------------
 WALSH_BW_LENGTHS = {
@@ -701,6 +721,35 @@ class ScrambleData(object):
         new_state.extend(self._state[:-1])
         self._state = new_state
 
+class ScrambleWalsh(object):
+    ## Trinomial(159,31)
+    def __init__(self):
+        self.reset()
+    def reset(self):
+        self._counter = 0
+        self._state = np.array([0, 0, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1,
+                                1, 1, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,
+                                1, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 1, 0,
+                                1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0,
+                                1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 1,
+                                0, 1, 1, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 1, 1, 1,
+                                1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1,
+                                1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 0,
+                                1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0,
+                                1, 0, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 0, 1, 1], dtype=np.bool)
+    def next(self):
+        if self._counter == 2048:
+            self._reset()
+        self._advance()
+        self._counter += 1
+        return 4*self._state[2] + 2*self._state[1] + self._state[0]
+
+    def _advance(self):
+        for i in range(16):
+            new_bit = self._state[31] ^ self._state[158]
+            self._state = np.roll(self._state,1)
+            self._state[0] = new_bit
+
 ## ---- physcal layer class -----------------------------------------------------
 class PhysicalLayer(object):
     """Physical layer description for MIL-STD-188-110 Appendix D"""
@@ -711,7 +760,7 @@ class PhysicalLayer(object):
         self._bw  = 3
         self._frame_counter = -1
         self._constellations = [BPSK, QPSK, PSK8, QAM16, QAM32, QAM64, QAM256]
-        self._scr_data = ScrambleData(3) ## TODO
+        self._scr_data  = ScrambleData(3) ## TODO
 
     def get_constellations(self):
         return self._constellations
@@ -746,16 +795,35 @@ class PhysicalLayer(object):
                         return [self._fixed_s,MODE_BPSK,success,False]
                     else: ## TODO
                         self._frame_counter = 0
-                        self._scr_data.reset()
-                        self._state = 'MP'
-                        [mode,a] = self.get_next_data_frame(success)
-                        return [a,mode,success,False]
+                        if self._wid != MODE_WALSH:
+                            self._scr_data.reset()
+                            self._state = 'MP'
+                            [mode,a] = self.get_next_data_frame(success)
+                            return [a,mode,success,False]
+                        else: ## WID0
+                            self._frame_counter += 1
+                            return [self._walsh_s,MODE_BPSK,success,True]
         else: ## data mode
             print('XXXXX {} frame_counter={}'.format(self._state, self._frame_counter))
-            [mode,a] = self.get_next_data_frame(success)
-            self._frame_counter += (self._state == 'MP')
-            success = np.abs(np.real(np.mean(symbols[::2]))) > 0.7 if self._state == 'MP' else True
-            return [a,mode,success,success]
+            if self._wid != MODE_WALSH:
+                [mode,a] = self.get_next_data_frame(success)
+                self._frame_counter += (self._state == 'MP')
+                success = np.abs(np.real(np.mean(symbols[::2]))) > 0.7 if self._state == 'MP' else True
+                return [a,mode,success,success]
+            else: ## WID0
+                self._frame_counter += 1
+                m = len(symbols)//32
+                z = np.zeros(8*m, dtype=np.complex64)
+                for i,s in enumerate(symbols.reshape(m, 32)):
+                    # print('WALSH test:', i,
+                    #       np.mean(s.reshape(8,4)[0::2], 0)<0,
+                    #       np.mean(s.reshape(8,4)[1::2], 0)<0)
+                    z[8*i  :8*i+4] = np.mean(s.reshape(8,4)[0::2], 0)
+                    z[8*i+4:8*i+8] = np.mean(s.reshape(8,4)[1::2], 0)
+
+                success = [np.mean(np.abs(np.real(z))) > 0.5, np.mean(np.abs(np.imag(z))) < 0.5]
+                print('WALSH test:',z[-8:], success)
+                return [self._walsh_s,MODE_BPSK,all(success),True]
 
     def get_next_data_frame(self, success):
         ## TODO
@@ -790,17 +858,17 @@ class PhysicalLayer(object):
 
     def decode_walsh(self, symbols):
         wlen = self._wlen
-        return np.array([FROM_WALSH[np.packbits
-                                    (np.real
-                                     (np.sum
-                                      (symbols[wlen*i:wlen*(i+1)].reshape((wlen//4,4)),0))<0)[0]]
+        return np.array([FROM_WALSH4[np.packbits
+                                     (np.real
+                                      (np.sum
+                                       (symbols[wlen*i:wlen*(i+1)].reshape((wlen//4,4)),0))<0)[0]]
                          for i in range(len(symbols)//wlen)],
                         dtype=np.uint8)
 
     def decode_fixed(self, symbols):
         print('decode_fixed: ', len(symbols))
         data = self.decode_walsh(symbols)
-        success = np.all(data == FIXED_WALSH_SYMBOLS)
+        success = np.all(data[2:] == FIXED_WALSH_SYMBOLS[2:])
         print('data=', data, success)
         return success
 
@@ -832,15 +900,19 @@ class PhysicalLayer(object):
         b[0] ^= b[5] ^ b[4] ^ b[3]
         success = np.all(b[0:3] == 0)
         b = np.flip(b)
-        self._wid         = np.packbits(b[0:4])[0]>>4
+        self._wid = wid   = np.packbits(b[0:4])[0]>>4
         self._intl_type   = INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
         self._constraint_length = 'K=7' if b[6] == 0 else 'K=9'
         self._data_mode   = WID_MODE[self._wid]
-        self._unknown     = BW_UNKNOWN[self._bw][self._wid]
-        self._known       = BW_KNOWN[self._bw][self._wid]
-        mp_info = MP_LEN_BASE_SHIFT[self._known]
-        self._mp          = make_mp(self._known, mp_info['base_len'], 0)
-        self._mp_shifted  = make_mp(self._known, mp_info['base_len'], mp_info['base_shift'])
+        print('WID:', self._wid, self._intl_type, self._constraint_length,self._data_mode)
+        self._unknown     = -1
+        self._known       = 0
+        if wid != MODE_WALSH:
+            self._unknown     = BW_UNKNOWN[self._bw][self._wid]
+            self._known       = BW_KNOWN[self._bw][self._wid]
+            mp_info = MP_LEN_BASE_SHIFT[self._known]
+            self._mp          = make_mp(self._known, mp_info['base_len'], 0)
+            self._mp_shifted  = make_mp(self._known, mp_info['base_len'], mp_info['base_shift'])
         intl_info         = BW_INTL[self._bw][self._wid][self._intl_type]
         self._intl_frames = intl_info[0]
 
@@ -863,34 +935,52 @@ class PhysicalLayer(object):
         self._wlen = wlen = WALSH_BW_LENGTHS[bw]
         DIBIT = np.zeros((4,wlen), dtype=np.uint8)
         for i in range(4):
-            DIBIT[i][:] = np.concatenate([WALSH[i][:] for _ in range(wlen//4)])
+            DIBIT[i][:] = np.concatenate([WALSH4[i][:] for _ in range(wlen//4)])
         ## ---- preamble symbols ---------------------------------------------------------
         SYNC_SYMB = common.n_psk(2, np.concatenate([DIBIT[i][:]
                                                     for i in FIXED_WALSH_SYMBOLS]))
         CNT_SYMB = np.zeros(4*wlen, dtype=np.complex64)
         WID_SYMB = np.zeros(5*wlen, dtype=np.complex64)
         ## ---- preamble scramble symbols ------------------------------------------------
-        SYNC_SCR  = common.n_psk(8, np.concatenate([FIXED_PN for _ in range(9)]))[:len(SYNC_SYMB)]
-        CNT_SCR   = common.n_psk(8, np.concatenate([CNT_PN   for _ in range(4)]))[:len(CNT_SYMB)]
-        WID_SCR   = common.n_psk(8, np.concatenate([WID_PN   for _ in range(5)]))[:len(WID_SYMB)]
+        SYNC_SCR  = common.n_psk(8, np.concatenate([FIXED_PN[:wlen] for _ in range(9)]))
+        CNT_SCR   = common.n_psk(8, np.concatenate([CNT_PN[:wlen]   for _ in range(4)]))
+        WID_SCR   = common.n_psk(8, np.concatenate([WID_PN[:wlen]   for _ in range(5)]))
 
         self._fixed_s = common.make_scr(SYNC_SCR*SYNC_SYMB,
                                         SYNC_SCR)
+        print('FIXED: ', np.round(np.mod(np.angle(self._fixed_s['symb'])/np.pi*4, 8)))
         self._cnt_s   = common.make_scr(CNT_SCR*CNT_SYMB,
                                         CNT_SCR)
         self._wid_s   = common.make_scr(WID_SCR*WID_SYMB,
                                         WID_SCR)
+        self._walsh_s = np.zeros(2048, dtype=common.SYMB_SCRAMBLE_DTYPE)
+        scr_walsh = ScrambleWalsh()
+        self._walsh_s['scramble'] = common.n_psk(8, np.array([scr_walsh.next() for _ in range(2048)], dtype=np.uint8))
 
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
-        is_full = self._deinterleaver.load(soft_dec)
-        if not is_full:
+        interleaver_is_full = False
+        if self._wid == MODE_WALSH: ## TODO
+            n = len(soft_dec) // 32
+            soft_bits = np.zeros(2*n, dtype=np.float32)
+            for i in range(n):
+                w = np.sum(soft_dec[32*i:32*(i+1)].reshape(4,8),0)
+                b = FROM_WALSH4[np.packbits(w[0:4]>0)[0]]
+                print('WALSH', i, w, b)
+                abs_soft_dec = np.mean(np.abs(w))
+                soft_bits[2*i]   = abs_soft_dec*(2*(b>>1)-1)
+                soft_bits[2*i+1] = abs_soft_dec*(2*(b &1)-1)
+            #print('WALSH soft_bits=', soft_bits)
+            interleaver_is_full = self._deinterleaver.load(soft_bits)
+        else:
+            interleaver_is_full = self._deinterleaver.load(soft_dec)
+        if not interleaver_is_full:
             return []
 
         r  = self._deinterleaver.fetch()
         rd = self._depuncturer.process(r)
         self._viterbi_decoder.reset()
-        decoded_bits = self._viterbi_decoder.udpate(rd)
+        decoded_bits = np.roll(self._viterbi_decoder.udpate(rd), 7)
         print('quality={}% num_bits={}'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
                                                len(decoded_bits)))
         return decoded_bits
@@ -901,7 +991,7 @@ class PhysicalLayer(object):
 
     def get_preamble_z(self):
         """preamble symbols for preamble correlation"""
-        return 2,np.array([z for z in self._fixed_s['symb'][0:3*self._wlen]
+        return 2,np.array([z for z in self._fixed_s['symb']
                            for _ in range(self._sps)])
 
 if __name__ == '__main__':
@@ -913,3 +1003,7 @@ if __name__ == '__main__':
     #    print(np.real(make_mp(24,13,0)))
     #    print(np.real(make_mp(24,13,6)))
     print(mp_base(196))
+    s = ScrambleWalsh()
+    x = [s.next() for _ in range(32)]
+    print(x)
+    print(x == [5, 6, 2, 1, 7, 3, 1, 1, 6, 0, 5, 4, 0, 7, 7, 0, 5, 3, 1, 3, 3, 2, 2, 5, 5, 4, 7, 3, 5, 4, 3, 0])
