@@ -60,7 +60,7 @@ class physical_layer_driver(gr.hier_block2):
         self._corr_est           = digital.corr_est_cc(symbols    = (preamble_samples.tolist()),
                                                        sps        = sps,
                                                        mark_delay = preamble_offset,
-                                                       threshold  = 0.3,
+                                                       threshold  = 0.5,
                                                        threshold_method = 1)
         self._doppler_correction = digitalhf.doppler_correction_cc(preamble_length, len(preamble_samples))
         self._adaptive_filter    = digitalhf.adaptive_dfe(sps, nB, nF, nW, mu, alpha)
@@ -83,7 +83,9 @@ class physical_layer_driver(gr.hier_block2):
         self.msg_connect((self._msg_proxy, 'frame_info'), (self._adaptive_filter, 'frame_info'))
 
         constellations_data = self._physical_layer_driver_description.get_constellations()
-        constellations_msg  = pmt.to_pmt([{'idx': idx, 'points': c['points'], 'symbols': c['symbols']}
+        constellations_msg  = pmt.to_pmt([{'idx'    : idx,
+                                           'points' : c['points'],
+                                           'symbols': c['symbols']}
                                           for (idx,c) in enumerate(constellations_data)])
         self._adaptive_filter.to_basic_block()._post(pmt.intern('constellations'), constellations_msg)
 
