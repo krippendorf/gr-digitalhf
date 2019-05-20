@@ -793,13 +793,13 @@ class PhysicalLayer(object):
                     if self._superframe_counter != 0:
                         self._state = 'FIXED'
                         return [self._fixed_s,MODE_BPSK,success,False]
-                    else: ## TODO
+                    else:
                         self._frame_counter = 0
                         if self._wid != MODE_WALSH:
                             self._scr_data.reset()
                             self._state = 'MP'
                             [mode,a] = self.get_next_data_frame(success)
-                            return [a,mode,success,False]
+                            return [a,mode,success,True]
                         else: ## WID0
                             self._frame_counter += 1
                             return [self._walsh_s,MODE_BPSK,success,True]
@@ -808,10 +808,13 @@ class PhysicalLayer(object):
             if self._wid != MODE_WALSH:
                 [mode,a] = self.get_next_data_frame(success)
                 self._frame_counter += (self._state == 'MP')
-                success = np.abs(np.real(np.mean(symbols[::2]))) > 0.7 if self._state == 'MP' else True
-                return [a,mode,success,success]
+                success = np.abs(np.real(np.mean(symbols[::2]))) > 0.5 if self._state == 'MP' else True
+                if success == False:
+                    print('TEST: {} success={} {} {}'.format(self._state, success, symbols[::2], np.mean(symbols[::2])))
+                return [a,mode,success,True]
             else: ## WID0
                 self._frame_counter += 1
+                ## TODO: WALSH16 check for BW > 30kHz
                 m = len(symbols)//32
                 z = np.zeros(8*m, dtype=np.complex64)
                 for i,s in enumerate(symbols.reshape(m, 32)):
@@ -831,9 +834,11 @@ class PhysicalLayer(object):
             self._state = 'DATA'
             a = np.zeros(self._known, common.SYMB_SCRAMBLE_DTYPE)
             if (self._frame_counter % self._intl_frames) == self._intl_frames-1:
+                print('next_data_fram MP_shifted ', self._frame_counter, self._intl_frames)
                 a['symb'][:]     = self._mp_shifted
                 a['scramble'][:] = self._mp_shifted
             else:
+                print('next_data_frame MP_regular', self._frame_counter, self._intl_frames)
                 a['symb'][:]     = self._mp
                 a['scramble'][:] = self._mp
             return MODE_BPSK,a
@@ -842,7 +847,7 @@ class PhysicalLayer(object):
             a = np.zeros(self._unknown, common.SYMB_SCRAMBLE_DTYPE)
             a['scramble'][:] = 1
             self._scr_data.reset()
-            if self._wid_mode <= MODE_8PSK: ## not QAM
+            if self._data_mode <= MODE_8PSK: ## not QAM
                 for i in range(self._unknown):
                     a['scramble'][i] = np.exp(2j*np.pi*self._scr_data.next()/8)
             else: ## QAM modes
@@ -852,7 +857,22 @@ class PhysicalLayer(object):
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
+        print('get_doppler', len(iq_samples))
         success,doppler = True,0
+        sps  = self._sps
+        wlen = self._wlen
+        _,zp = self.get_preamble_z()
+        cc   = np.correlate(iq_samples, zp)
+        imax = np.argmax(np.abs(cc[0:wlen*sps]))
+        idx  = np.arange(wlen*sps)
+        print('get_doppler ccmax: ', imax, np.abs(cc[imax]))
+        pks  = [np.correlate(iq_samples[imax+i*wlen*sps+idx],
+                             zp[i*wlen*sps+idx])[0]
+                for i in range((len(iq_samples)-imax) // (wlen*sps))]
+        print('get_doppler pks: ', pks, np.angle(pks))
+        doppler = common.freq_est(pks)/(wlen*sps)
+        print('get_doppler doppler: ', doppler)
+
         ## TODO
         return success,doppler
 
@@ -901,7 +921,7 @@ class PhysicalLayer(object):
         success = np.all(b[0:3] == 0)
         b = np.flip(b)
         self._wid = wid   = np.packbits(b[0:4])[0]>>4
-        self._intl_type   = INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
+        self._intl_type   = 'L'# INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
         self._constraint_length = 'K=7' if b[6] == 0 else 'K=9'
         self._data_mode   = WID_MODE[self._wid]
         print('WID:', self._wid, self._intl_type, self._constraint_length,self._data_mode)
@@ -960,12 +980,12 @@ class PhysicalLayer(object):
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
         interleaver_is_full = False
-        if self._wid == MODE_WALSH: ## TODO
+        if self._wid == MODE_WALSH: ## TODO: WALSH16 decoding for BW > 30kHz
             n = len(soft_dec) // 32
             soft_bits = np.zeros(2*n, dtype=np.float32)
             for i in range(n):
                 w = np.sum(soft_dec[32*i:32*(i+1)].reshape(4,8),0)
-                b = FROM_WALSH4[np.packbits(w[0:4]>0)[0]]
+                b = FROM_WALSH4[np.packbits(w[0:4]>0)[0]] ## TODO use 2nd half of WALSH bits
                 print('WALSH', i, w, b)
                 abs_soft_dec = np.mean(np.abs(w))
                 soft_bits[2*i]   = abs_soft_dec*(2*(b>>1)-1)
