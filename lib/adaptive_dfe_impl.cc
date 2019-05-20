@@ -143,9 +143,11 @@ adaptive_dfe_impl::general_work(int noutput_items,
 
   const int nin = ninput_items[0];
 
+//  GR_LOG_DEBUG(d_logger, str(boost::format("work: %d %d") % ninput_items[0] % (2*_nGuard + _nB + _nF + 1)));
   assert(ninput_items[0] >= 2*_nGuard + _nB + _nF + 1);
   if (ninput_items[0] < 2*_nGuard + _nB + _nF + 1)
     return 0;
+
   int const ninput = ninput_items[0] - _nGuard - _nF;
 
   int nout = 0; // counter for produced output items
@@ -429,7 +431,7 @@ void adaptive_dfe_impl::update_frame_info(pmt::pmt_t data)
   gr::digital::constellation_sptr constell = _constellations[_constellation_index];
   for (int i=0, n=scr_xor.size(); i<n; ++i) {
     for (int j=0, m=constell->bits_per_symbol(); j<m; ++j) {
-      _scramble_xor[i][m-j-1] = 1 - 2*bool(scr_xor[i] & (1<<j));
+      _scramble_xor[i][j] = 1 - 2*bool(scr_xor[i] & (1<<(m-1-j)));
       // GR_LOG_DEBUG(d_logger, str(boost::format("XOR %3d %3d %d") % i % j % _scramble_xor[i][j]));
     }
   }

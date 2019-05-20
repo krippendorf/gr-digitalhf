@@ -60,6 +60,7 @@ doppler_correction_cc_impl::doppler_correction_cc_impl(unsigned int preamble_len
   message_port_register_in (_port_name);
   set_msg_handler(_port_name, boost::bind(&doppler_correction_cc_impl::handle_message, this, _1));
   set_tag_propagation_policy(TPP_DONT);
+  set_min_output_buffer(0, _preamble_length<<1);
 }
 
 doppler_correction_cc_impl::~doppler_correction_cc_impl()
@@ -91,8 +92,8 @@ doppler_correction_cc_impl::handle_message(pmt::pmt_t msg)
 void
 doppler_correction_cc_impl::forecast(int noutput_items, gr_vector_int &ninput_items_required)
 {
-  ninput_items_required[0] = _preamble_length + 1;
-//  GR_LOG_DEBUG(d_logger, str(boost::format("forecast: %d %d %d") % noutput_items % ninput_items_required[0] % _preamble_length));
+  ninput_items_required[0] = std::max(int(_preamble_length + 1), noutput_items);
+  // GR_LOG_DEBUG(d_logger, str(boost::format("forecast: %d %d %d") % noutput_items % ninput_items_required[0] % _preamble_length));
 }
 
 int
@@ -103,9 +104,10 @@ doppler_correction_cc_impl::work(int noutput_items,
   gr::thread::scoped_lock lock(d_setlock);
   gr_complex const* in = (gr_complex const*)input_items[0];
   gr_complex *out = (gr_complex *) output_items[0];
-  // GR_LOG_DEBUG(d_logger, str(boost::format("work: %d %d") % noutput_items % _preamble_length));
-  if (noutput_items < _preamble_length)
+  if (noutput_items < _preamble_length) {
+    GR_LOG_DEBUG(d_logger, str(boost::format("work: %d %d") % noutput_items % _preamble_length));
     return 0;
+  }
   noutput_items -= _preamble_length;
   int nout = 0;
   switch (_state) {
