@@ -73,7 +73,7 @@ class ScrambleData(object):
         return r
 
     def _advance(self):
-        self._state = np.concatenate(([np.sum(self._state&self._taps)&1],
+        self._state = np.concatenate(([self._state.dot(self._taps)&1],
                                       self._state[0:-1]))
 
 ## ---- preamble definitions  ---------------------------------------------------
@@ -97,7 +97,8 @@ REINSERTED_PREAMBLE=common.n_psk(8, np.array(
      0,4,0,4,0,0,4,4,0,0,0,0,0, # + D2
      6,
      4,4,4,4,4,6,0,2,4,0,4,0,4,2,0,6,4,4,4,4,4,6,0,2,4,0,4,0,4,2,0])) ## MP-
-## length 31
+
+## length 31 mini-probes
 MINI_PROBE=[common.n_psk(8, np.array([0,0,0,0,0,2,4,6,0,4,0,4,0,6,4,2,0,0,0,0,0,2,4,6,0,4,0,4,0,6,4])), ## sign = + (0)
             common.n_psk(8, np.array([4,4,4,4,4,6,0,2,4,0,4,0,4,2,0,6,4,4,4,4,4,6,0,2,4,0,4,0,4,2,0]))] ## sign = - (1)
 
@@ -155,8 +156,8 @@ class DeIntl_DePunct(object):
     def __init__(self, size, incr):
         self._size    = size
         self._i       = 0
-        self._array   = np.zeros(size, dtype=np.float32)
-        self._idx     = np.mod(incr*np.arange(size, dtype=np.uint32), size)
+        self._array   = np.zeros(size, dtype=np.float64)
+        self._idx     = np.mod(incr*np.arange(size, dtype=np.int32), size)
         print('deinterleaver: ', size, incr, self._idx[0:100])
 
     def fetch(self, a):
@@ -173,6 +174,7 @@ class DeIntl_DePunct(object):
         self._i += n
         result = np.zeros(0, dtype=np.float64)
         if self._i == self._size:
+            print('deinterleaver: ', self._idx[0:100])
             print('==== TEST ====', self._array)
             #tmp = np.zeros(self._size, dtype=np.float32)
             tmp = self._array[self._idx]
@@ -237,7 +239,7 @@ class PhysicalLayer(object):
                 success = self.decode_reinserted_preamble(symbols)
             else:
                 success = self.get_data_frame_quality(symbols)
-            return [self.make_data_frame(success),self._constellation_index,success,not got_reinserted_preamble]
+            return [self.make_data_frame(success),self._constellation_index,success,True]
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
@@ -278,7 +280,7 @@ class PhysicalLayer(object):
         return np.abs(np.mean(symbols[-32:])) > 0.5
 
     def get_data_frame_quality(self, symbols):
-        print('get_data_frame_quality', symbols[-31:])
+        print('get_data_frame_quality', np.mean(symbols[-31:]))
         return np.abs(np.mean(symbols[-31:])) > 0.5
 
     def decode_reinserted_preamble(self, symbols):
@@ -364,7 +366,7 @@ class PhysicalLayer(object):
         if r.shape[0] == 0:
             return []
         self._viterbi_decoder.reset()
-        decoded_bits = self._viterbi_decoder.udpate(r)
+        decoded_bits = np.roll(self._viterbi_decoder.udpate(r), 7)
         print('bits=', decoded_bits[:100])
         print('quality={}% ({},{})'.format(120.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
                                            self._viterbi_decoder.quality(),
