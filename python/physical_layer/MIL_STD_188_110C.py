@@ -45,16 +45,27 @@ QAM64=np.array(
         range(64)), common.CONST_DTYPE)
 
 ## for test
-#QAM64 = QAM64[(7,3,24,56,35,39,60,28),]
-#QAM64['symbols'] = [1, 0, 2, 6, 4, 5, 7, 3]
+QAM64p = QAM64[(3,24,56,35,39,60,28,7),]
+QAM64p['symbols'] = range(8) ## not used
+
+## ---- Walsh-4 codes ----------------------------------------------------------
+WALSH4 = np.array([[0,0,0,0],  # 0 - 00
+                   [0,1,0,1],  # 1 - 01
+                   [0,0,1,1],  # 2 - 10
+                   [0,1,1,0]], # 3 - 11
+                  dtype=np.uint8)
+FROM_WALSH4 = -np.ones(256, dtype=np.int8)
+for i in range(4):
+    FROM_WALSH4[np.packbits(WALSH4[i][:])[0]] = i
 
 ## ---- constellation indices ---------------------------------------------------
-MODE_BPSK  = 0
-MODE_QPSK  = 1
-MODE_8PSK  = 2
-MODE_16QAM = 3
-MODE_32QAM = 4
-MODE_64QAM = 5
+MODE_BPSK   = 0
+MODE_QPSK   = 1
+MODE_8PSK   = 2
+MODE_16QAM  = 3
+MODE_32QAM  = 4
+MODE_64QAM  = 5
+MODE_64QAMp = 6
 
 ## ---- data scrambler -----------------------------------------------------------
 class ScrambleData(object):
@@ -75,6 +86,35 @@ class ScrambleData(object):
     def _advance(self):
         self._state = np.concatenate(([self._state.dot(self._taps)&1],
                                       self._state[0:-1]))
+
+
+class ScrambleDataP(object):
+    """data scrambling sequence generator"""
+    def __init__(self):
+        self._i = 0
+        state = np.array([0,0,0,0,0,0,0,0,0,0,0,1], dtype=np.uint8)
+        taps =  np.array([1,1,0,0,1,0,1,0,0,0,0,0], dtype=np.uint8)
+        n = 10000
+        m = len(state)
+        sequence = np.zeros(n, dtype=np.uint8)
+        sequence[0:m] = state
+        for i in range(m,n):
+            sequence[i] = sequence[i-m:i].dot(taps)&1
+        idx = np.arange(160, dtype=np.uint32)
+        self._seq = 4*sequence[3530+idx] + 2*sequence[4042+idx] + sequence[4796+idx]
+
+    def reset(self):
+        self._i = 0
+
+    def get_seq(self):
+        return self._seq
+
+    def next(self):
+        if self._i == 160:
+            self._i = 0
+        s = self._seq[self._i]
+        self._i += 1
+        return s
 
 ## ---- preamble definitions  ---------------------------------------------------
 ## 184 = 8*23
@@ -203,7 +243,7 @@ class PhysicalLayer(object):
         """intialization"""
         self._sps = sps
         self._frame_counter = -2
-        self._constellations = [BPSK, QPSK, PSK8, QAM16, QAM32, QAM64]
+        self._constellations = [BPSK, QPSK, PSK8, QAM16, QAM32, QAM64, QAM64p]
         self._preamble = self.get_preamble()
         self._scramble = ScrambleData()
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
@@ -307,28 +347,36 @@ class PhysicalLayer(object):
         self._rate_info = rate_info = TO_RATE[self._mode['rate']]
         self._intl_info = intl_info = TO_INTERLEAVER[self._mode['interleaver']]
 
-        print('======== rate,interleaver:', rate_info, intl_info)
-        self._interleaver_frames = intl_info['frames']
-        baud      = rate_info['baud']
-        intl_id   = intl_info['id']
-        intl_size = INTL_SIZE[baud][intl_id]
-        intl_incr = INTL_INCR[baud][intl_id]
-        if self._deintl_depunct == None:
-            self._deintl_depunct = DeIntl_DePunct(size=intl_size,
-                                                  incr=intl_incr)
-        self._constellation_index = rate_info['ci']
-        print('constellation index', self._constellation_index)
-        self._scramble.reset()
-        num_bits = max(3, rate_info['bits_per_symbol'])
-        iscr = np.array([self._scramble.next(num_bits) for _ in range(256)],
-                        dtype=np.uint8)
-        print('iscr=', iscr)
-        self._data_scramble     = np.ones (256, dtype=np.complex64)
-        self._data_scramble_xor = np.zeros(256, dtype=np.uint8)
-        if rate_info['ci'] > MODE_8PSK:
-            self._data_scramble_xor = iscr
+        self._12800burst_mode = mode['rate']==(1,1,0) and mode['interleaver']==(0,0,1)
+        print('======== rate,interleaver:', rate_info, intl_info, self._12800burst_mode)
+        if self._12800burst_mode:
+            self._scrp = ScrambleDataP()
+            self._constellation_index = MODE_BPSK# 64QAMp
+            self._data_scramble     = np.ones (256, dtype=np.complex64)
+            self._data_scramble_xor = np.zeros(256, dtype=np.uint8)
+            ##self._data_scramble   = QAM64p['points'][self._scrp.next() for _ in range(256)]
         else:
-            self._data_scramble = common.n_psk(8, iscr)
+            self._interleaver_frames = intl_info['frames']
+            baud      = rate_info['baud']
+            intl_id   = intl_info['id']
+            intl_size = INTL_SIZE[baud][intl_id]
+            intl_incr = INTL_INCR[baud][intl_id]
+            if self._deintl_depunct == None:
+                self._deintl_depunct = DeIntl_DePunct(size=intl_size,
+                                                  incr=intl_incr)
+            self._constellation_index = rate_info['ci']
+            print('constellation index', self._constellation_index)
+            self._scramble.reset()
+            num_bits = max(3, rate_info['bits_per_symbol'])
+            iscr = np.array([self._scramble.next(num_bits) for _ in range(256)],
+                            dtype=np.uint8)
+            print('iscr=', iscr)
+            self._data_scramble     = np.ones (256, dtype=np.complex64)
+            self._data_scramble_xor = np.zeros(256, dtype=np.uint8)
+            if rate_info['ci'] > MODE_8PSK:
+                self._data_scramble_xor = iscr
+            else:
+                self._data_scramble = common.n_psk(8, iscr)
         return success
 
     def make_reinserted_preamble(self, offset, success):
@@ -344,7 +392,10 @@ class PhysicalLayer(object):
     def make_data_frame(self, success):
         self._preamble_offset = -72 ## all following reinserted preambles start at index -72
         a = np.zeros(256+31, common.SYMB_SCRAMBLE_DTYPE)
-        a['scramble'][:256]     = self._data_scramble
+        if self._12800burst_mode:
+            a['scramble'][:256] = QAM64p['points'][[self._scrp.next() for _ in range(256)]]
+        else:
+            a['scramble'][:256] = self._data_scramble
         a['scramble_xor'][:256] = self._data_scramble_xor
         n = (self._frame_counter-1)%72
         if self._frame_counter == 72:
@@ -362,16 +413,30 @@ class PhysicalLayer(object):
         return a
 
     def decode_soft_dec(self, soft_dec):
-        r = self._deintl_depunct.load(soft_dec)
-        if r.shape[0] == 0:
-            return []
-        self._viterbi_decoder.reset()
-        decoded_bits = np.roll(self._viterbi_decoder.udpate(r), 7)
-        print('bits=', decoded_bits[:100])
-        print('quality={}% ({},{})'.format(120.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
-                                           self._viterbi_decoder.quality(),
-                                           len(decoded_bits)))
-        return decoded_bits
+        if self._12800burst_mode:
+            print('decode_soft_dec', len(soft_dec))
+            n = len(soft_dec) // 32
+            soft_bits = np.zeros(2*n, dtype=np.float32)
+            for i in range(n):
+                w = np.sum(soft_dec[32*i:32*(i+1)].reshape(8,4),0)
+                b = FROM_WALSH4[np.packbits(w>0)[0]] ## TODO use 2nd half of WALSH bits
+                abs_soft_dec = np.mean(np.abs(w))
+                print('WALSH', i, w, b, abs_soft_dec)
+                soft_bits[2*i]   = abs_soft_dec*(2*(b>>1)-1)
+                soft_bits[2*i+1] = abs_soft_dec*(2*(b &1)-1)
+
+            return soft_bits>0
+        else:
+            r = self._deintl_depunct.load(soft_dec)
+            if r.shape[0] == 0:
+                return []
+            self._viterbi_decoder.reset()
+            decoded_bits = np.roll(self._viterbi_decoder.udpate(r), 7)
+            print('bits=', decoded_bits[:100])
+            print('quality={}% ({},{})'.format(120.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
+                                               self._viterbi_decoder.quality(),
+                                               len(decoded_bits)))
+            return decoded_bits
 
     @staticmethod
     def get_preamble():
@@ -407,3 +472,6 @@ if __name__ == '__main__':
     #    print(QAM64['points'][i])
 
     print([s.next(6) for _ in range(256)])
+
+    s = ScrambleDataP()
+    assert(np.all(s.get_seq()[0:20]==np.array([0,2,4,3,3,6,4,5,7,6,7,0,5,5,4,3,5,4,3,7], dtype=np.uint8)))
