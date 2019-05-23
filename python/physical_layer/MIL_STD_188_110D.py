@@ -921,7 +921,7 @@ class PhysicalLayer(object):
         success = np.all(b[0:3] == 0)
         b = np.flip(b)
         self._wid = wid   = np.packbits(b[0:4])[0]>>4
-        self._intl_type   = 'L'# INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
+        self._intl_type   = INTERLEAVERS[np.packbits(b[4:6])[0]>>6]
         self._constraint_length = 'K=7' if b[6] == 0 else 'K=9'
         self._data_mode   = WID_MODE[self._wid]
         print('WID:', self._wid, self._intl_type, self._constraint_length,self._data_mode)
