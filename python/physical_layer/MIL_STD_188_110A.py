@@ -78,7 +78,7 @@ class ScrambleData(object):
 ## ---- constellatios -----------------------------------------------------------
 BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), common.CONST_DTYPE)
 QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), common.CONST_DTYPE)
-PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,7,6,4,5]), common.CONST_DTYPE)
+PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,6,7,5,4]), common.CONST_DTYPE)
 
 ## ---- constellation indices ---------------------------------------------------
 MODE_BPSK=0
@@ -88,7 +88,7 @@ MODE_8PSK=2
 ## ---- mode definitions --------------------------------------------------------
 MODE = [[{} for _ in range(8)] for _  in range(8)]
 MODE[7][6] = {'bit_rate':4800, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': 'n/a', 'repeat': 1}
-MODE[7][7] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
+MODE[7][7] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
 MODE[6][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 MODE[4][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['L', 40,576], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
@@ -283,7 +283,7 @@ class PhysicalLayer(object):
         print('decode_soft_dec r=', r.shape)
         if r.shape[0] == 0:
             return []
-        print('deinterleaved bits: ', r>0)
+        ##print('deinterleaved bits: ', [x for x in 1*(r>0)])
         rd = self._depuncturer.process(r)
         self._viterbi_decoder.reset()
         decoded_bits = self._viterbi_decoder.udpate(rd)
