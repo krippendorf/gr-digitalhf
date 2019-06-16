@@ -191,7 +191,10 @@ class PhysicalLayer(object):
                     a = symbols[32*i:32*(i+1)]
                     success &= np.max(np.imag(np.mean(a.reshape(8,4),0))) < 0.25
             elif self._frame_counter < self._num_frames_per_block-2:
-                success = np.mean(np.real(symbols[self._mode['unknown']:])) > 0.7
+                success = np.mean(np.real(symbols[self._mode['unknown']:])) > 0.4 or np.max(np.imag(symbols[self._mode['unknown']:])) < 0.6
+            if not success:
+                print('aborting: ', symbols[self._mode['unknown']:], np.mean(np.real(symbols[self._mode['unknown']:])),
+                      np.max(np.imag(symbols[self._mode['unknown']:])))
             return [self.get_next_data_frame(success),self._mode['ci'],success,success]
 
     def get_next_data_frame(self, success):
