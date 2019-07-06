@@ -60,7 +60,7 @@ class physical_layer_driver(gr.hier_block2):
         self._corr_est           = digital.corr_est_cc(symbols    = (preamble_samples.tolist()),
                                                        sps        = sps,
                                                        mark_delay = preamble_offset,
-                                                       threshold  = 0.5,
+                                                       threshold  = 0.3,
                                                        threshold_method = 1)
         self._doppler_correction = digitalhf.doppler_correction_cc(preamble_length, len(preamble_samples))
         self._adaptive_filter    = digitalhf.adaptive_dfe(sps, nB, nF, nW, mu, alpha)
