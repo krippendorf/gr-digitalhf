@@ -193,8 +193,8 @@ class PhysicalLayer(object):
             elif self._frame_counter < self._num_frames_per_block-2:
                 success = np.mean(np.real(symbols[self._mode['unknown']:])) > 0.4 or np.max(np.imag(symbols[self._mode['unknown']:])) < 0.6
             if not success:
-                print('aborting: ', symbols[self._mode['unknown']:], np.mean(np.real(symbols[self._mode['unknown']:])),
-                      np.max(np.imag(symbols[self._mode['unknown']:])))
+                print('aborting: ', symbols[self._mode['unknown']:])# np.mean(np.real(symbols[self._mode['unknown']:])),
+                #np.max(np.imag(symbols[self._mode['unknown']:])))
             return [self.get_next_data_frame(success),self._mode['ci'],success,success]
 
     def get_next_data_frame(self, success):
@@ -290,7 +290,7 @@ class PhysicalLayer(object):
         rd = self._depuncturer.process(r)
         self._viterbi_decoder.reset()
         decoded_bits = self._viterbi_decoder.udpate(rd)
-        print('bits=', decoded_bits)
+        ##print('bits=', decoded_bits)
         print('quality={}%'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))))
         return decoded_bits
 
