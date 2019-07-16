@@ -18,12 +18,12 @@
  * Boston, MA 02110-1301, USA.
  */
 
-namespace gr {
-namespace digitalhf {
-
 #include <array>
 #include <cmath>
 #include <cstdint>
+
+namespace gr {
+namespace digitalhf {
 
 template<size_t N>
 class llr_to_prob {
