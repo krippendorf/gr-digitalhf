@@ -33,4 +33,5 @@ except ImportError:
 # import any pure python here
 from .physical_layer_driver import physical_layer_driver
 from .msg_proxy import msg_proxy
+from .cis_12_channelizer import cis_12_channelizer
 #

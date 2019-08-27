@@ -31,7 +31,8 @@ list(APPEND digitalhf_sources
     viterbi27_impl.cc
     viterbi29_impl.cc
     viterbi39_impl.cc
-    viterbi48_impl.cc)
+    viterbi48_impl.cc
+    vector_pll_cc_impl.cc)
 
 set(digitalhf_sources "${digitalhf_sources}" PARENT_SCOPE)
 if(NOT digitalhf_sources)

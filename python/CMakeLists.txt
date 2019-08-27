@@ -33,6 +33,7 @@ GR_PYTHON_INSTALL(
     FILES
     __init__.py
     physical_layer_driver.py
+    cis_12_channelizer.py
     msg_proxy.py DESTINATION ${GR_PYTHON_DIR}/digitalhf
 )
 
