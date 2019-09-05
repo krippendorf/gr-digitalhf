@@ -150,9 +150,20 @@ doppler_correction_cc_impl::work(int noutput_items,
     } // CONSUME_AND_SKIP
   }
   // apply current doppler correction to all produced samples
+#if 0 // rotateN is broken in some older VOLK versions
   _rotator.rotateN(out, in, nout);
+#else
+  for (int i=0; i<nout; ++i)
+    out[i] = _rotator.rotate(in[i]);
+#endif
   // Tell runtime system how many output items we produced.
   return nout;
+}
+bool
+doppler_correction_cc_impl::stop()
+{
+  GR_LOG_DEBUG(d_logger, "doppler_correction stop");
+  return true;
 }
 
 } /* namespace digitalhf */

@@ -266,6 +266,7 @@ class PhysicalLayer(object):
         self._preamble = self.get_preamble()
         self._scramble = ScrambleData()
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
+        self._mode_description = 'UNKNOWN'
 
     def get_constellations(self):
         return self._constellations
@@ -307,7 +308,8 @@ class PhysicalLayer(object):
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
-        success,doppler = True,0
+        r = {'success': False, ## -- quality flag
+             'doppler': 0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) != 0:
             sps  = self._sps
             m    = 23*sps
@@ -325,19 +327,22 @@ class PhysicalLayer(object):
                                                 zp[i*m+idx])[11*sps+np.arange(-2*sps,2*sps)]))
                     for i in range((n//m)-1)]
             tests = np.abs(pks[0:-1])/val
-            success = np.median(tests) > 2.0
+            r['success'] = bool(np.median(tests) > 2.0)
             print('test:', np.abs(pks), tests)
-            if success:
+            if r['success']:
                 print('doppler apks', np.abs(pks))
                 print('doppler ppks', np.angle(pks),
                       np.diff(np.unwrap(np.angle(pks)))/m,
                       np.mean(np.diff(np.unwrap(np.angle(pks)))/m))
-                doppler = common.freq_est(pks)/m;
-            print('success=', success, 'doppler=', doppler)
-        return success,doppler
+                r['doppler'] = common.freq_est(pks)/m
+            print(r)
+        return r
 
     def set_mode(self, mode):
         pass
+
+    def get_mode(self):
+        return self._mode_description
 
     def get_preamble_quality(self, symbols):
         print('get_preamble_quality', np.abs(np.mean(symbols[-32:])), symbols[-32:])
@@ -353,7 +358,6 @@ class PhysicalLayer(object):
         return self._mode_name == '12800bpsBurst'
     def is_HFXL(self):
         return self._mode_name == 'HFXL'
-
 
     def decode_reinserted_preamble(self, symbols):
         ## decode D0,D1,D2
@@ -385,13 +389,14 @@ class PhysicalLayer(object):
         if rate_info['baud'] == 'HFXL':
             self._mode_name = 'HFXL'
 
+        self._mode_description = '%s rate=%s intl=%s' % (self._mode_name, rate_info['baud'], intl_info['id'])
+
         print('======== rate,interleaver:', rate_info, intl_info, self._mode_name)
         self._data_scramble_xor = np.zeros(256, dtype=np.uint8)
         self._data_scramble     = np.ones (256, dtype=np.complex64)
         if self.is_12800bpsBurst():
             self._scrp = ScrambleDataP()
-            self._constellation_index = MODE_BPSK# 64QAMp
-            ##self._data_scramble   = QAM64p['points'][self._scrp.next() for _ in range(256)]
+            self._constellation_index = MODE_BPSK
         elif self.is_HFXL():
             self._scramble.reset()
             num_bits = 3
@@ -511,23 +516,25 @@ class PhysicalLayer(object):
                 soft_bits[2*i]   = abs_soft_dec*(2*(b>>1)-1)
                 soft_bits[2*i+1] = abs_soft_dec*(2*(b &1)-1)
 
-            return soft_bits>0
+            return soft_bits>0,100.0
         elif self.is_HFXL():
             ## TODO
-            return []
+            return np.zeros(0, dtype=np.float32),0.0
+
         elif self.is_plain_110C():
             r = self._deintl_depunct.load(soft_dec)
             if r.shape[0] == 0:
-                return []
+                return np.zeros(0, dtype=np.float32),0.0
             self._viterbi_decoder.reset()
             decoded_bits = np.roll(self._viterbi_decoder.udpate(r), 7)
             print('bits=', decoded_bits[:100])
-            print('quality={}% ({},{})'.format(120.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
+            quality = 120.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))
+            print('quality={}% ({},{})'.format(quality,
                                                self._viterbi_decoder.quality(),
                                                len(decoded_bits)))
-            return decoded_bits
+            return decoded_bits,quality
         else:
-            return []
+            return np.zeros(0, dtype=np.float32),0.0
 
     @staticmethod
     def get_preamble():

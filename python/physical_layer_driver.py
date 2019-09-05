@@ -103,3 +103,9 @@ class physical_layer_driver(gr.hier_block2):
 
     def set_mode(self, mode):
         self._physical_layer_driver_description.set_mode(mode)
+
+    def get_quality(self):
+        return self._msg_proxy.get_quality()
+
+    def get_mode(self):
+        return self._physical_layer_driver_description.get_mode()
