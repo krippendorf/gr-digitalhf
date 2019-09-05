@@ -1,1 +1,2 @@
 *.cmake linguist-detectable=false
+*.wav filter=lfs diff=lfs merge=lfs -text
