@@ -13,7 +13,8 @@ filter_update::sptr lms::make(float mu) {
 
 lms::lms(float mu)
   : _mu(mu)
-  , _gain() {
+  , _gain()
+  , _tmp() {
 }
 
 lms::~lms() {
@@ -23,6 +24,7 @@ void lms::resize(size_t n) {
   if (_gain.size() == n)
     return;
   _gain.resize(n);
+  _tmp.resize(n);
   std::fill_n(_gain.begin(), n, 0);
 }
 
@@ -33,12 +35,16 @@ void lms::reset() {
 gr_complex const* lms::update(gr_complex const* beg,
                               gr_complex const* end) {
   assert(end-beg > 0);
-  size_t n = end - beg;
+  size_t const n = end - beg;
   resize(n);
-  for (size_t i=0; i<n; ++i)
-    _gain[i] = _mu * std::conj(beg[i]);
+  volk_32fc_conjugate_32fc(&_tmp[0], beg, n);
+  volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], _mu, 2*n);
 
   return &_gain.front();
+}
+
+void lms::set_parameters(std::map<std::string, float>const & p) {
+  _mu = p.at("mu");
 }
 
 } // namespace digitalhf

@@ -70,6 +70,7 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
   , _mu(mu)
   , _alpha(alpha)
   , _use_symbol_taps(true)
+  , _tmp()
   , _taps_samples()
   , _taps_symbols()
   , _hist_symbols()
@@ -185,7 +186,7 @@ adaptive_dfe_impl::general_work(int noutput_items,
         }
         // rotate samples
         if (i == i0) {
-#if 0
+#ifdef USE_VOLK_ROTATOR
           _rotator.rotateN(&_rotated_samples[0] + i - _nB,
                            in      + i - _nB,
                            _nB+_nF+1);
@@ -194,7 +195,7 @@ adaptive_dfe_impl::general_work(int noutput_items,
             _rotated_samples[j + i-_nB] = _rotator.rotate(in[j + i-_nB]);
 #endif
         } else {
-#if 0
+#ifdef USE_VOLK_ROTATOR
           _rotator.rotateN(&_rotated_samples[0] + i + _nF+1 - _sps,
                            in      + i + _nF+1 - _sps,
                            _sps);
@@ -219,6 +220,7 @@ adaptive_dfe_impl::general_work(int noutput_items,
 bool adaptive_dfe_impl::start()
 {
   gr::thread::scoped_lock lock(d_setlock);
+  _tmp.resize(_nB+_nF+1);
   _taps_samples.resize(_nB+_nF+1);
   _last_taps_samples.resize(_nB+_nF+1);
   _taps_symbols.resize(_nW);
@@ -227,8 +229,8 @@ bool adaptive_dfe_impl::start()
   GR_LOG_DEBUG(d_logger,str(boost::format("adaptive_dfe_impl::start() nB=%d nF=%d mu=%f alpha=%f")
                              % _nB % _nF % _mu % _alpha));
 
-  //_filter_update = lms::make(_mu);
-  _filter_update = rls::make(0.001, 0.9999);
+  _filter_update = lms::make(_mu);
+  //_filter_update = rls::make(0.001, 0.9999);
   return true;
 }
 bool adaptive_dfe_impl::stop()
@@ -290,11 +292,9 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
       std::cout << "err= " << std::abs(err) << std::endl;
     //       taps_samples
     gr_complex const* gain = _filter_update->update(start, end);
-    for (int j=0; j<_nB+_nF+1; ++j) {
-      _last_taps_samples[j] = _taps_samples[j];
-      _taps_samples[j]     += _mu*std::conj(start[j]) * err;
-//      _taps_samples[j]     += gain[j] * err;
-    }
+    std::copy(_taps_samples.begin(), _taps_samples.end(), _last_taps_samples.begin());
+    volk_32fc_s32fc_multiply_32fc(&_tmp[0],           gain,              err,     _nB+_nF+1);
+    volk_32fc_x2_add_32fc        (&_taps_samples[0], &_taps_samples[0], &_tmp[0], _nB+_nF+1);
     //       taps_symbols
     if (_use_symbol_taps) {
       for (int j=0; j<_nW; ++j) {
@@ -310,9 +310,7 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
   if (update_taps) {
     if (_symbol_counter != 0) { // a filter tap shift might have ocurred when _symbol_counter==0
       gr_complex acc(0);
-      for (int j=0; j<_nB+_nF+1; ++j) {
-        acc += std::conj(_last_taps_samples[j]) * _taps_samples[j];
-      }
+      volk_32fc_x2_conjugate_dot_prod_32fc(&acc, &_taps_samples[0], &_last_taps_samples[0], _nB+_nF+1);
       float const frequency_err = gr::fast_atan2f(acc)/(0+1*_num_samples_since_filter_update); // frequency error (rad/sample)
       GR_LOG_DEBUG(d_logger, str(boost::format("frequency_err= %f %d") % frequency_err % _num_samples_since_filter_update));
       _control_loop.advance_loop(frequency_err);
@@ -334,13 +332,6 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
 
 int
 adaptive_dfe_impl::recenter_filter_taps() {
-#if 0
-  ssize_t const _idx_max = std::distance(_taps_samples.begin(),
-                                         std::max_element(_taps_samples.begin()+_nB+1-3*_sps, _taps_samples.begin()+_nB+1+3*_sps,
-                                                         [](gr_complex a, gr_complex b) {
-                                                           return std::norm(a) < std::norm(b);
-                                                         }));
-#else
   float sum_w=0, sum_wi=0;
   for (int i=0; i<_nB+_nF+1; ++i) {
     float const w = std::norm(_taps_samples[i]);
@@ -348,7 +339,7 @@ adaptive_dfe_impl::recenter_filter_taps() {
     sum_wi += w*i;
   }
   ssize_t const idx_max = ssize_t(0.5 + sum_wi/sum_w);
-#endif
+
   // GR_LOG_DEBUG(d_logger, str(boost::format("idx_max=%2d abs(tap_max)=%f") % idx_max % std::abs(_taps_samples[idx_max])));
   if (idx_max-_nB-1 > +2*_sps) {
     // maximum is right of the center tap
@@ -445,7 +436,6 @@ void adaptive_dfe_impl::update_frame_info(pmt::pmt_t data)
       // GR_LOG_DEBUG(d_logger, str(boost::format("XOR %3d %3d %d") % i % j % _scramble_xor[i][j]));
     }
   }
-
   assert(_symbols.size() == _scramble.size());
   _descrambled_symbols.resize(_symbols.size());
   _vec_soft_decisions.clear();

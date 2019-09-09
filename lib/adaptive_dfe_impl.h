@@ -60,7 +60,6 @@ private:
 class adaptive_dfe_impl : public adaptive_dfe {
 private:
   typedef std::vector<gr_complex, volk_allocator<gr_complex> > gr_complex_vec_type;
-//  typedef std::vector<gr_complex> gr_complex_vec_type;
 
   int _sps;
   int _nB, _nF, _nW;
@@ -71,6 +70,7 @@ private:
 
   bool _use_symbol_taps;
 
+  gr_complex_vec_type _tmp;
   gr_complex_vec_type _taps_samples;
   gr_complex_vec_type _taps_symbols;
   gr_complex_vec_type _last_taps_samples;
@@ -105,7 +105,7 @@ private:
   } _state;
 
   filter_update::sptr _filter_update;
-//  void update_constellations(boost::python::object obj);
+
   void update_constellations(pmt::pmt_t );
   void update_frame_info(pmt::pmt_t );
 
@@ -135,7 +135,7 @@ public:
                            gr_vector_const_void_star &input_items,
                            gr_vector_void_star &output_items);
 
-  virtual void set_mu(float mu) { _mu = mu; }
+  virtual void set_mu(float mu) { _mu = mu; _filter_update->set_parameters({{"mu", mu}}); }
   virtual void set_alpha(float alpha) { _alpha = alpha; }
 } ;
 
