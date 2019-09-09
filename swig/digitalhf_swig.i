@@ -15,6 +15,7 @@
 #include "digitalhf/viterbi39.h"
 #include "digitalhf/viterbi48.h"
 #include "digitalhf/vector_pll_cc.h"
+#include "digitalhf/vector_early_late_cc.h"
 %}
 
 %include "digitalhf/adaptive_dfe.h"
@@ -25,6 +26,9 @@ GR_SWIG_BLOCK_MAGIC2(digitalhf, doppler_correction_cc);
 
 %include "digitalhf/vector_pll_cc.h"
 GR_SWIG_BLOCK_MAGIC2(digitalhf, vector_pll_cc);
+
+%include "digitalhf/vector_early_late_cc.h"
+GR_SWIG_BLOCK_MAGIC2(digitalhf, vector_early_late_cc);
 
 /* FIXME */
 %include "digitalhf/viterbi27.h"
