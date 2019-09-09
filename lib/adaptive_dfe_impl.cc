@@ -33,9 +33,8 @@
 
 #include "adaptive_dfe_impl.h"
 
-#define VOLK_SAFE_DELETE(x) \
-  volk_free(x);             \
-  x = nullptr
+#include "lms.hpp"
+#include "rls.hpp"
 
 namespace gr {
 namespace digitalhf {
@@ -71,9 +70,9 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
   , _mu(mu)
   , _alpha(alpha)
   , _use_symbol_taps(true)
-  , _taps_samples(nullptr)
-  , _taps_symbols(nullptr)
-  , _hist_symbols(nullptr)
+  , _taps_samples()
+  , _taps_symbols()
+  , _hist_symbols()
   , _hist_symbol_index(0)
   , _constellations()
   , _npwr()
@@ -89,11 +88,12 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
   , _msg_ports{{"soft_dec",   pmt::intern("soft_dec")},
                {"frame_info", pmt::intern("frame_info")}}
   , _msg_metadata(pmt::make_dict())
-  , _state(WAIT_FOR_PREAMBLE)
   , _num_samples_since_filter_update(0)
   , _rotated_samples()
   , _rotator()
   , _control_loop(2*M_PI/100, 5e-2, -5e-2)
+  , _state(WAIT_FOR_PREAMBLE)
+  , _filter_update()
 {
   GR_LOG_DECLARE_LOGPTR(d_logger);
   GR_LOG_ASSIGN_LOGPTR(d_logger, "adaptive_dfe");
@@ -115,9 +115,6 @@ adaptive_dfe_impl::adaptive_dfe_impl(int sps, // samples per symbol
 adaptive_dfe_impl::~adaptive_dfe_impl()
 {
   _msg_metadata = pmt::PMT_NIL;
-  VOLK_SAFE_DELETE(_taps_samples);
-  VOLK_SAFE_DELETE(_taps_symbols);
-  VOLK_SAFE_DELETE(_hist_symbols);
 }
 
 void
@@ -162,6 +159,7 @@ adaptive_dfe_impl::general_work(int noutput_items,
         _state = WAIT_FOR_FRAME_INFO;
         GR_LOG_DEBUG(d_logger, "got preamble tag > wait for frame info");
       }
+      _filter_update->reset();
       break;
     } // WAIT_FOR_PREAMBLE
     case WAIT_FOR_FRAME_INFO: {
@@ -208,7 +206,7 @@ adaptive_dfe_impl::general_work(int noutput_items,
         assert(i+_nF < nin && i-1-_nB >= 0);
         out_symb[nout] = filter(&_rotated_samples.front() + i - _nB,
                                 &_rotated_samples.front() + i + _nF+1);
-        std::memcpy(&out_taps[(_nB+_nF+1)*nout], _taps_samples, (_nB+_nF+1)*sizeof(gr_complex));
+        std::memcpy(&out_taps[(_nB+_nF+1)*nout], &_taps_samples.front(), (_nB+_nF+1)*sizeof(gr_complex));
         ++nout;
       } // next sample
       consume(0, ninput_processed);
@@ -221,23 +219,23 @@ adaptive_dfe_impl::general_work(int noutput_items,
 bool adaptive_dfe_impl::start()
 {
   gr::thread::scoped_lock lock(d_setlock);
-  _taps_samples      = (gr_complex*)(volk_malloc((_nB+_nF+1)*sizeof(gr_complex), volk_get_alignment()));
-  _last_taps_samples = (gr_complex*)(volk_malloc((_nB+_nF+1)*sizeof(gr_complex), volk_get_alignment()));
-  _taps_symbols      = (gr_complex*)(volk_malloc(        _nW*sizeof(gr_complex), volk_get_alignment()));
-  _hist_symbols      = (gr_complex*)(volk_malloc(      2*_nW*sizeof(gr_complex), volk_get_alignment()));
+  _taps_samples.resize(_nB+_nF+1);
+  _last_taps_samples.resize(_nB+_nF+1);
+  _taps_symbols.resize(_nW);
+  _hist_symbols.resize(2*_nW);
   reset_filter();
   GR_LOG_DEBUG(d_logger,str(boost::format("adaptive_dfe_impl::start() nB=%d nF=%d mu=%f alpha=%f")
                              % _nB % _nF % _mu % _alpha));
+
+  //_filter_update = lms::make(_mu);
+  _filter_update = rls::make(0.001, 0.9999);
   return true;
 }
 bool adaptive_dfe_impl::stop()
 {
   gr::thread::scoped_lock lock(d_setlock);
   GR_LOG_DEBUG(d_logger, "adaptive_dfe_impl::stop()");
-  VOLK_SAFE_DELETE(_taps_samples);
-  VOLK_SAFE_DELETE(_last_taps_samples);
-  VOLK_SAFE_DELETE(_taps_symbols);
-  VOLK_SAFE_DELETE(_hist_symbols);
+  _filter_update.reset();
   return true;
 }
 
@@ -249,7 +247,7 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
   // (1a) taps_samples
   volk_32fc_x2_dot_prod_32fc(&filter_output,
                              start,
-                             _taps_samples,
+                             &_taps_samples.front(),
                              _nB+_nF+1);
   // (1b) taps_symbols
   gr_complex dot_symbols(0);
@@ -287,13 +285,15 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
     _num_samples_since_filter_update += _sps;
 
     // (3a) update of adaptive filter taps
-    gr_complex const err =  filter_output - known_symbol;
+    gr_complex const err =  known_symbol - filter_output;
     if (std::abs(err)>0.7)
       std::cout << "err= " << std::abs(err) << std::endl;
     //       taps_samples
+    gr_complex const* gain = _filter_update->update(start, end);
     for (int j=0; j<_nB+_nF+1; ++j) {
       _last_taps_samples[j] = _taps_samples[j];
-      _taps_samples[j]     -= _mu*err*std::conj(start[j]);
+      _taps_samples[j]     += _mu*std::conj(start[j]) * err;
+//      _taps_samples[j]     += gain[j] * err;
     }
     //       taps_symbols
     if (_use_symbol_taps) {
@@ -335,8 +335,8 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
 int
 adaptive_dfe_impl::recenter_filter_taps() {
 #if 0
-  ssize_t const _idx_max = std::distance(_taps_samples,
-                                        std::max_element(_taps_samples+_nB+1-3*_sps, _taps_samples+_nB+1+3*_sps,
+  ssize_t const _idx_max = std::distance(_taps_samples.begin(),
+                                         std::max_element(_taps_samples.begin()+_nB+1-3*_sps, _taps_samples.begin()+_nB+1+3*_sps,
                                                          [](gr_complex a, gr_complex b) {
                                                            return std::norm(a) < std::norm(b);
                                                          }));
@@ -354,17 +354,17 @@ adaptive_dfe_impl::recenter_filter_taps() {
     // maximum is right of the center tap
     //   -> shift taps to the left left
     GR_LOG_DEBUG(d_logger, "shift left");
-    std::copy(_taps_samples+4*_sps, _taps_samples+_nB+_nF+1, _taps_samples);
-    std::fill_n(_taps_samples+_nB+_nF+1-4*_sps, 4*_sps, gr_complex(0));
+    std::copy(_taps_samples.begin()+4*_sps, _taps_samples.begin()+_nB+_nF+1, _taps_samples.begin());
+    std::fill_n(_taps_samples.begin()+_nB+_nF+1-4*_sps, 4*_sps, gr_complex(0));
     return +4*_sps;
   }
   if (idx_max-_nB-1 < -2*_sps) {
     // maximum is left of the center tap
     //   -> shift taps to the right
     GR_LOG_DEBUG(d_logger, "shift right");
-    std::copy_backward(_taps_samples, _taps_samples+_nB+_nF+1-4*_sps,
-                       _taps_samples+_nB+_nF+1);
-    std::fill_n(_taps_samples, 4*_sps, gr_complex(0));
+    std::copy_backward(_taps_samples.begin(), _taps_samples.begin()+_nB+_nF+1-4*_sps,
+                       _taps_samples.begin()+_nB+_nF+1);
+    std::fill_n(_taps_samples.begin(), 4*_sps, gr_complex(0));
     return -4*_sps;
   }
   return 0;
@@ -372,10 +372,10 @@ adaptive_dfe_impl::recenter_filter_taps() {
 
 void adaptive_dfe_impl::reset_filter()
 {
-  std::fill_n(_taps_samples,              _nB+_nF+1, gr_complex(0));
-  std::fill_n(_last_taps_samples,         _nB+_nF+1, gr_complex(0));
-  std::fill_n(_taps_symbols,                    _nW, gr_complex(0));
-  std::fill_n(_hist_symbols,                  2*_nW, gr_complex(0));
+  std::fill(_taps_samples.begin(),      _taps_samples.end(),      gr_complex(0));
+  std::fill(_last_taps_samples.begin(), _last_taps_samples.end(), gr_complex(0));
+  std::fill(_taps_symbols.begin(),      _taps_symbols.end(),      gr_complex(0));
+  std::fill(_hist_symbols.begin(),      _hist_symbols.end(),      gr_complex(0));
   _taps_symbols[0]     = 1;
   _hist_symbol_index   = 0;
   _num_samples_since_filter_update = 0;
@@ -387,11 +387,11 @@ void adaptive_dfe_impl::publish_frame_info()
   GR_LOG_DEBUG(d_logger, str(boost::format("publish_frame_info %d == %d") % _descrambled_symbols.size() % _symbols.size()));
   data = pmt::dict_add(data,
                        pmt::intern("symbols"),
-                       pmt::init_c32vector(_descrambled_symbols.size(), &_descrambled_symbols.front()));
+                       pmt::init_c32vector(_descrambled_symbols.size(), _descrambled_symbols));
   // for (int i=0; i<_vec_soft_decisions.size(); ++i)
   //   _vec_soft_decisions[i] = std::max(-1.0f, std::min(1.0f, _vec_soft_decisions[i]));
   data = pmt::dict_add(data,
-                       pmt::intern("soft_dec"), pmt::init_f32vector(_vec_soft_decisions.size(), &_vec_soft_decisions.front()));
+                       pmt::intern("soft_dec"), pmt::init_f32vector(_vec_soft_decisions.size(), _vec_soft_decisions));
   message_port_pub(_msg_ports["frame_info"], data);
   _descrambled_symbols.clear();
 }

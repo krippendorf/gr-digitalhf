@@ -26,6 +26,9 @@
 #include <gnuradio/digital/constellation.h>
 #include <digitalhf/adaptive_dfe.h>
 
+#include "filter_update.hpp"
+#include "volk_allocator.hpp"
+
 namespace gr {
 namespace digitalhf {
 
@@ -56,6 +59,9 @@ private:
 
 class adaptive_dfe_impl : public adaptive_dfe {
 private:
+  typedef std::vector<gr_complex, volk_allocator<gr_complex> > gr_complex_vec_type;
+//  typedef std::vector<gr_complex> gr_complex_vec_type;
+
   int _sps;
   int _nB, _nF, _nW;
   int _nGuard;
@@ -65,25 +71,21 @@ private:
 
   bool _use_symbol_taps;
 
-  // module name w.r.t. digitalhf.physical_layer containing a PhysicalLayer class
-  // std::string           _py_module_name;
-  // boost::python::object _physicalLayer; // class instance of physical layer description
+  gr_complex_vec_type _taps_samples;
+  gr_complex_vec_type _taps_symbols;
+  gr_complex_vec_type _last_taps_samples;
 
-  gr_complex* _taps_samples;
-  gr_complex* _taps_symbols;
-  gr_complex* _last_taps_samples;
-
-  gr_complex* _hist_symbols;
+  gr_complex_vec_type _hist_symbols;
   int _hist_symbol_index;
 
   std::vector<gr::digital::constellation_sptr> _constellations;
   std::vector<constellation_distance_filter> _npwr;
   int _npwr_max_time_constant;
   int _constellation_index;
-  std::vector<gr_complex>   _symbols;
-  std::vector<gr_complex>   _scramble; // PSK-8 scramble symbols
+  std::vector<gr_complex> _symbols;
+  std::vector<gr_complex> _scramble; // PSK-8 scramble symbols
   std::vector<std::array<int,8> > _scramble_xor; // signs for XOR scrambling
-  std::vector<gr_complex>   _descrambled_symbols;
+  std::vector<gr_complex> _descrambled_symbols;
   int _symbol_counter;
 
   bool _save_soft_decisions;
@@ -92,7 +94,7 @@ private:
   pmt::pmt_t _msg_metadata;
 
   int _num_samples_since_filter_update;
-  std::vector<gr_complex> _rotated_samples;
+  gr_complex_vec_type _rotated_samples;
   blocks::rotator _rotator;
   gr::blocks::control_loop _control_loop;
 
@@ -102,6 +104,7 @@ private:
     DO_FILTER
   } _state;
 
+  filter_update::sptr _filter_update;
 //  void update_constellations(boost::python::object obj);
   void update_constellations(pmt::pmt_t );
   void update_frame_info(pmt::pmt_t );
