@@ -320,15 +320,21 @@ class PhysicalLayer(object):
             cc   = np.correlate(iq_samples, zp)
             imax = np.argmax(np.abs(cc[0:23*sps]))
             print('imax=', imax, len(iq_samples))
-            pks  = [np.correlate(iq_samples[imax+i*m+idx],
-                                 zp[i*m+idx])[0]
-                    for i in range(n//m)]
-            val  = [np.mean(np.abs(np.correlate(iq_samples[imax+i*m+idx2],
-                                                zp[i*m+idx])[11*sps+np.arange(-2*sps,2*sps)]))
-                    for i in range((n//m)-1)]
-            tests = np.abs(pks[0:-1])/val
-            r['success'] = bool(np.median(tests) > 2.0)
-            print('test:', np.abs(pks), tests)
+            pks  = np.array([np.correlate(iq_samples[imax+i*m+idx],
+                                          zp[i*m+idx])[0]
+                             for i in range(n//m)])
+            val  = np.array([np.mean(np.abs(np.correlate(iq_samples[imax+i*m+idx2],
+                                                         zp[i*m+idx])[11*sps+np.arange(-2*sps,2*sps)]))
+                             for i in range((n//m)-1)])
+            ## filter out
+            (i,) = (np.abs(pks) > 0.5*np.mean(np.abs(pks[-3:]))).nonzero()
+            i    = i[0] if i.size > 0 else 0
+            pks = pks[i:]
+            val = val[i:]
+            if pks.size > 1:
+                tests = np.abs(pks[:-1])/val
+                r['success'] = bool(np.median(tests) > 2.0)
+                print('test:', np.abs(pks), tests)
             if r['success']:
                 print('doppler apks', np.abs(pks))
                 print('doppler ppks', np.angle(pks),
