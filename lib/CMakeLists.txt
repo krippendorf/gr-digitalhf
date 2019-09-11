@@ -35,7 +35,10 @@ list(APPEND digitalhf_sources
     vector_pll_cc_impl.cc
     vector_early_late_cc_impl.cc
     lms.cc
+    nlms.cc
     rls.cc
+    kalman_exp.cc
+    kalman_hsu.cc
     )
 
 set(digitalhf_sources "${digitalhf_sources}" PARENT_SCOPE)

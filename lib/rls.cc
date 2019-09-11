@@ -15,7 +15,8 @@ rls::rls(float delta, float lambda)
   : _delta(delta)
   , _lambda(lambda)
   , _gain()
-  , _inv_corr() {
+  , _inv_corr()
+  , _tmp() {
 }
 
 rls::~rls() {
@@ -60,8 +61,9 @@ gr_complex const* rls::update(gr_complex const* beg,
     volk_32fc_s32fc_multiply_32fc(&_tmp[0], &_gain[0], -_pu[i], n);
     volk_32fc_x2_add_32fc(&_inv_corr[k], &_inv_corr[k], &_tmp[0], n);
     volk_32f_s32f_multiply_32f((float*)&_inv_corr[k], (float const*)&_inv_corr[k], 1.0f/_lambda, 2*n);
-    _inv_corr[k+i] += _delta;
+    _inv_corr[k+i] = std::real(_inv_corr[k+i]);
   }
+
   return &_gain.front();
 }
 

@@ -34,7 +34,10 @@
 #include "adaptive_dfe_impl.h"
 
 #include "lms.hpp"
+#include "nlms.hpp"
 #include "rls.hpp"
+#include "kalman_exp.hpp"
+#include "kalman_hsu.hpp"
 
 namespace gr {
 namespace digitalhf {
@@ -228,9 +231,11 @@ bool adaptive_dfe_impl::start()
   reset_filter();
   GR_LOG_DEBUG(d_logger,str(boost::format("adaptive_dfe_impl::start() nB=%d nF=%d mu=%f alpha=%f")
                              % _nB % _nF % _mu % _alpha));
-
   _filter_update = lms::make(_mu);
-  //_filter_update = rls::make(0.001, 0.9999);
+  // _filter_update = nlms::make(0.5);
+  // _filter_update = rls::make(0.001f, 0.999f); // not stable
+  // _filter_update = kalman_exp::make(1.0f, 0.999f); // too slow
+  // _filter_update = kalman_hsu::make(0.008f, 0.1f); // not stable
   return true;
 }
 bool adaptive_dfe_impl::stop()
@@ -338,7 +343,10 @@ adaptive_dfe_impl::recenter_filter_taps() {
     sum_w  += w;
     sum_wi += w*i;
   }
-  ssize_t const idx_max = ssize_t(0.5 + sum_wi/sum_w);
+  // TODO
+  static float mp = _nB+1;
+  mp = 0.9*mp + 0.1*sum_wi/sum_w;
+  ssize_t const idx_max = ssize_t(0.5 + mp);
 
   // GR_LOG_DEBUG(d_logger, str(boost::format("idx_max=%2d abs(tap_max)=%f") % idx_max % std::abs(_taps_samples[idx_max])));
   if (idx_max-_nB-1 > +2*_sps) {
