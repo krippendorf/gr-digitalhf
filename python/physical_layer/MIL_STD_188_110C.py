@@ -344,7 +344,7 @@ class PhysicalLayer(object):
             print(r)
         return r
 
-    def set_mode(self, mode):
+    def set_mode(self, _):
         pass
 
     def get_mode(self):

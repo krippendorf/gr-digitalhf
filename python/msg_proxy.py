@@ -62,13 +62,15 @@ class msg_proxy(gr.basic_block):
         symbols  = pmt.to_python(pmt.dict_ref(msg_in, pmt.intern('symbols'),  pmt.PMT_NIL))
         soft_dec = pmt.to_python(pmt.dict_ref(msg_in, pmt.intern('soft_dec'), pmt.PMT_NIL))
         symb,constellation_idx,do_continue,save_soft_dec = self._obj.get_next_frame(symbols)
-        if do_continue and len(soft_dec) != 0:
-            bits,self._quality = self._obj.decode_soft_dec(soft_dec)
-            bits = np.array(bits, dtype=np.uint8)
-            msg_out = pmt.make_dict()
-            msg_out = pmt.dict_add(msg_out, pmt.intern('packet_len'), pmt.to_pmt(len(bits)))
-            msg     = pmt.cons(msg_out, pmt.to_pmt(bits))
-            self.message_port_pub(self._port_bits, msg)
+        if len(soft_dec) != 0:
+            bits,q = self._obj.decode_soft_dec(soft_dec)
+            if len(bits) > 0:
+                self._quality = q
+                bits = np.array(bits, dtype=np.uint8)
+                msg_out = pmt.make_dict()
+                msg_out = pmt.dict_add(msg_out, pmt.intern('packet_len'), pmt.to_pmt(len(bits)))
+                msg     = pmt.cons(msg_out, pmt.to_pmt(bits))
+                self.message_port_pub(self._port_bits, msg)
 
         msg_out = pmt.to_pmt({'symb': symb['symb'],
                               'scramble': symb['scramble'],

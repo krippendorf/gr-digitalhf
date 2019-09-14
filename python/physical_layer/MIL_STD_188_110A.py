@@ -88,7 +88,12 @@ MODE_8PSK=2
 ## ---- mode definitions --------------------------------------------------------
 MODE = [[{} for _ in range(8)] for _  in range(8)]
 MODE[7][6] = {'bit_rate':4800, 'ci':MODE_8PSK, 'interleaver':['N',  1,  1], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': 'n/a', 'repeat': 1}
+MODE[5][6] = {} # reserved
+
 MODE[7][7] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
+
+#(5,7) is reserved
+MODE[5][7] = {'bit_rate': 600, 'ci':MODE_BPSK, 'interleaver':['S', 40, 18], 'unknown':20,'known':20, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 
 MODE[6][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['S', 40, 72], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
 MODE[4][4] = {'bit_rate':2400, 'ci':MODE_8PSK, 'interleaver':['L', 40,576], 'unknown':32,'known':16, 'nsymb': 1, 'coding_rate': '1/2', 'repeat': 1}
@@ -157,6 +162,7 @@ class PhysicalLayer(object):
         self._d1d2        = [-1,-1] ## D1,D2
         self._mode        = {}
         self._scr_data    = ScrambleData()
+        self._mode_description = 'UNKNOWN'
 
     def get_constellations(self):
         return self._constellations
@@ -216,7 +222,8 @@ class PhysicalLayer(object):
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
-        success,doppler = True,0
+        r = {'success': False, ## -- quality flag
+             'doppler': 0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) != 0:
             sps  = self._sps
             zp   = np.array([z for z in PhysicalLayer.get_preamble()['symb']
@@ -230,17 +237,17 @@ class PhysicalLayer(object):
             tpks = np.abs(cc[imax+3*16*sps:imax+5*16*sps])
             print('imax=', imax, 'apks=',apks,
                   np.mean(apks), np.mean(tpks))
-            success = np.mean(apks) > 5*np.mean(tpks) and apks[0]/apks[1] > 0.5 and apks[0]/apks[1] < 2.0
-            if success:
+            r['success'] = np.bool(np.mean(apks) > 5*np.mean(tpks) and apks[0]/apks[1] > 0.5 and apks[0]/apks[1] < 2.0)
+            if r['success']:
                 idx = np.arange(32*sps)
                 pks = [np.correlate(iq_samples[imax+i*32*sps+idx],
                                     zp[             i*32*sps+idx])[0]
                        for i in range(9)]
-                doppler = common.freq_est(pks)/(32*sps)
-                print('success=', success, 'doppler=', doppler,
+                r['doppler'] = common.freq_est(pks)/(32*sps)
+                print('success=', r['success'], 'doppler=', r['doppler'],
                       np.abs(np.array(pks)),
                       np.angle(np.array(pks)))
-        return success,doppler
+        return r
 
     def decode_preamble(self, symbols):
         data = [FROM_WALSH8[np.packbits
@@ -251,6 +258,7 @@ class PhysicalLayer(object):
         print('data=',data)
         self._pre_counter = sum([(x&3)*(1<<2*y) for (x,y) in zip(data[11:14][::-1], range(3))])
         self._d1d2 = data[9:11]
+        print('MODE:', data[9:11])
         self._mode = mode = MODE[data[9]][data[10]]
         self._block_len = 11520 if mode['interleaver'][0] == 'L' else 1440
         self._frame_len = mode['known'] + mode['unknown']
@@ -261,11 +269,17 @@ class PhysicalLayer(object):
         self._deinterleaver = Deinterleaver(mode['interleaver'][1], mode['interleaver'][2])
         self._depuncturer   = common.Depuncturer(repeat=mode['repeat'])
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
-        print(self._d1d2, mode, self._frame_len)
+        self._mode_description = 'MIL_STD_188-110A: %dbps intl=%s [U=%d,K=%d]' % (mode['bit_rate'],
+                                                                                  mode['interleaver'][0],
+                                                                                  mode['unknown'], mode['known'])
+        print(self._d1d2, mode, self._frame_len, self._mode_description)
         return True
 
     def set_mode(self, _):
         pass
+
+    def get_mode(self):
+        return self._mode_description
 
     def decode_soft_dec(self, soft_dec):
         print('decode_soft_dec', len(soft_dec), soft_dec.dtype)
@@ -285,14 +299,15 @@ class PhysicalLayer(object):
             r = self._deinterleaver.load(soft_dec)
         print('decode_soft_dec r=', r.shape)
         if r.shape[0] == 0:
-            return []
+            return [],0.0
         ##print('deinterleaved bits: ', [x for x in 1*(r>0)])
         rd = self._depuncturer.process(r)
         self._viterbi_decoder.reset()
         decoded_bits = self._viterbi_decoder.udpate(rd)
         ##print('bits=', decoded_bits)
-        print('quality={}%'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))))
-        return decoded_bits
+        quality = 100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))
+        print('quality={}%'.format(quality))
+        return decoded_bits,quality
 
     @staticmethod
     def get_preamble():
