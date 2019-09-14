@@ -14,10 +14,9 @@ namespace digitalhf {
 
 class nlms : public filter_update {
 public:
-  nlms(float mu);
   virtual ~nlms();
 
-  static sptr make(float mu);
+  static sptr make(float mu, float delta);
 
   virtual void reset();
   virtual gr_complex const* update(gr_complex const*, gr_complex const*);
@@ -27,9 +26,12 @@ protected:
   void resize(size_t);
 
 private:
+  nlms(float mu, float delta);
+
   typedef std::vector<gr_complex, volk_allocator<gr_complex> > complex_vec_type;
   typedef std::vector<float, volk_allocator<float> > real_vec_type;
   float _mu;
+  float _delta;
   complex_vec_type _gain;
   complex_vec_type _tmp;
   real_vec_type    _t1;

@@ -53,7 +53,7 @@ gr_complex const* rls::update(gr_complex const* beg,
   volk_32fc_x2_conjugate_dot_prod_32fc(&uPu, &_pu[0], beg, n);
 
   volk_32fc_conjugate_32fc(&_tmp[0], &_pu[0], n);
-  volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], 1.0f/(_lambda + std::real(uPu)), 2*n);
+  volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], 1.0f/(_lambda + std::real(uPu)/_lambda), 2*n);
 //  volk_32fc_s32fc_multiply_32fc(&_gain[0], &_tmp[0], 1/(_lambda + uPu), n);
 
   for (unsigned i=0; i<n; ++i) {
@@ -61,7 +61,6 @@ gr_complex const* rls::update(gr_complex const* beg,
     volk_32fc_s32fc_multiply_32fc(&_tmp[0], &_gain[0], -_pu[i], n);
     volk_32fc_x2_add_32fc(&_inv_corr[k], &_inv_corr[k], &_tmp[0], n);
     volk_32f_s32f_multiply_32f((float*)&_inv_corr[k], (float const*)&_inv_corr[k], 1.0f/_lambda, 2*n);
-    _inv_corr[k+i] = std::real(_inv_corr[k+i]);
   }
 
   return &_gain.front();

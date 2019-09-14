@@ -232,10 +232,10 @@ bool adaptive_dfe_impl::start()
   GR_LOG_DEBUG(d_logger,str(boost::format("adaptive_dfe_impl::start() nB=%d nF=%d mu=%f alpha=%f")
                              % _nB % _nF % _mu % _alpha));
   _filter_update = lms::make(_mu);
-  // _filter_update = nlms::make(0.5);
-  // _filter_update = rls::make(0.001f, 0.999f); // not stable
-  // _filter_update = kalman_exp::make(1.0f, 0.999f); // too slow
-  // _filter_update = kalman_hsu::make(0.008f, 0.1f); // not stable
+  //_filter_update = nlms::make(0.5f, 1.0f);
+  //_filter_update = rls::make(0.001f, 0.9f); // not stable
+  //_filter_update = kalman_exp::make(1.0f, 0.9f); // too slow
+  // _filter_update = kalman_hsu::make(0.02f, 0.1f); // not stable
   return true;
 }
 bool adaptive_dfe_impl::stop()

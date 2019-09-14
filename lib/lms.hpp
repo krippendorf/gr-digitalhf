@@ -14,7 +14,6 @@ namespace digitalhf {
 
 class lms : public filter_update {
 public:
-  lms(float mu);
   virtual ~lms();
 
   static sptr make(float mu);
@@ -27,6 +26,8 @@ protected:
   void resize(size_t);
 
 private:
+  lms(float mu);
+
   typedef std::vector<gr_complex, volk_allocator<gr_complex> > vec_type;
   float    _mu;
   vec_type _gain;

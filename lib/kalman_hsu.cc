@@ -3,7 +3,7 @@
 #include <cassert>
 #include "kalman_hsu.hpp"
 #include <volk/volk.h>
-
+#include <iostream>
 namespace gr {
 namespace digitalhf {
 
@@ -92,8 +92,10 @@ gr_complex const* kalman_hsu::update(gr_complex const* beg,
     }
   }
 
-  for (unsigned i=0; i<n; ++i)
+  for (unsigned i=0; i<n; ++i) {
+    _d[i] = 1.0f/(10.0f+1.0f/_d[i]);// regularization
     _g[i] *= y;
+  }
 
   return &_g[0];
 }

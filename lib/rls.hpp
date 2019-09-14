@@ -14,7 +14,6 @@ namespace digitalhf {
 
 class rls : public filter_update {
 public:
-  rls(float delta, float lambda);
   virtual ~rls();
 
   static sptr make(float delta, float lambda);
@@ -27,6 +26,8 @@ protected:
   void resize(size_t);
 
 private:
+  rls(float delta, float lambda);
+
   typedef std::vector<gr_complex, volk_allocator<gr_complex> > vec_type;
   float    _delta;
   float    _lambda;

@@ -20,7 +20,6 @@ namespace digitalhf {
 
 class kalman_hsu : public filter_update {
 public:
-  kalman_hsu(float q, float e);
   virtual ~kalman_hsu();
 
   static sptr make(float q, float e);
@@ -39,6 +38,8 @@ protected:
     return i+j*(j-1)/2; // lower-triangular matrix index -> linear index
   }
 private:
+  kalman_hsu(float q, float e);
+
   typedef std::vector<gr_complex, volk_allocator<gr_complex > > complex_vec_type;
   typedef std::vector<float, volk_allocator<float> > real_vec_type;
   float _q;

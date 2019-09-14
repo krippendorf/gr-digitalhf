@@ -16,7 +16,6 @@ namespace digitalhf {
 
 class kalman_exp : public filter_update {
 public:
-  kalman_exp(float r, float lambda);
   virtual ~kalman_exp();
 
   static sptr make(float r, float lambda);
@@ -29,6 +28,8 @@ protected:
   void resize(size_t);
 
 private:
+  kalman_exp(float r, float lambda);
+
   typedef std::vector<gr_complex, volk_allocator<gr_complex> > vec_type;
   float    _lambda;
   float    _r;
