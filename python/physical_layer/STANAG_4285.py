@@ -52,6 +52,8 @@ class PhysicalLayer(object):
         self._data     = self.get_data()
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
         self._mode_description = None
+        self._frame_counter = -1
+        self._fault_counter = 0
 
     def set_mode(self, mode):
         """set modulation and interleaver: 'BPS/S' or 'BPS/L'"""
@@ -61,6 +63,7 @@ class PhysicalLayer(object):
         self._deinterleaver = Deinterleaver(DEINTERLEAVER_INCR[intl] * MODES[bps]['deintl_multiple'])
         self._depuncturer   = common.Depuncturer(repeat           = MODES[bps]['repeat'],
                                                  puncture_pattern = MODES[bps]['punct'])
+        self._fault_counter = 0
 
     def get_mode(self):
         return self._mode_description
@@ -82,8 +85,18 @@ class PhysicalLayer(object):
             frame_description = [self._preamble,MODE_BPSK,success,False]
         else: ## current frame is a preamble frame
             idx = range(30,80)
+            idx = range(50)
             z = symbols[idx]*np.conj(self._preamble['symb'][idx])
-            success = bool(np.sum(np.real(z)<0) < 30)
+            mean_z = np.mean(z)
+            if np.sum(np.real(z)<0) < 30 and np.real(mean_z) > np.abs(np.imag(mean_z)) and np.real(mean_z) > 0.3:
+                self._fault_counter -= 1
+            else:
+                self._fault_counter += 1
+            self._fault_counter = min(11, max(0, self._fault_counter))
+            success = self._fault_counter < 10
+            if not success:
+                self._frame_counter = -2
+                self._fault_counter = 0
             frame_description = [self._data,self._mode,success,True]
 
         self._frame_counter += 1
@@ -91,6 +104,7 @@ class PhysicalLayer(object):
 
     def get_doppler(self, iq_samples):
         r = {'success': False, ## -- quality flag
+             'use_amp_est': self._frame_counter < 0,
              'doppler': 0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) == 0:
             return r

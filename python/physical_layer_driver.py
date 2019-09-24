@@ -20,6 +20,7 @@
 #
 
 import importlib
+import math
 from gnuradio import blocks
 from gnuradio import digital
 from gnuradio import filter
@@ -46,6 +47,7 @@ class physical_layer_driver(gr.hier_block2):
         self._nB    = nB
         self._nF    = nF
         self._nW    = nW
+        self._samp_rate = samp_rate
 
         m = importlib.import_module('digitalhf.physical_layer.'+description_name)
         self._physical_layer_driver_description = m.PhysicalLayer(sps)
@@ -60,8 +62,8 @@ class physical_layer_driver(gr.hier_block2):
         self._corr_est           = digital.corr_est_cc(symbols    = (preamble_samples.tolist()),
                                                        sps        = sps,
                                                        mark_delay = preamble_offset,
-                                                       threshold  = 0.1,
-                                                       threshold_method = 1)
+                                                       threshold  = 1-math.exp(-5),
+                                                       threshold_method = 0)
         self._doppler_correction = digitalhf.doppler_correction_cc(preamble_length, len(preamble_samples))
         self._adaptive_filter    = digitalhf.adaptive_dfe(sps, nB, nF, nW, mu, alpha)
         self._msg_proxy          = digitalhf.msg_proxy(self._physical_layer_driver_description)
@@ -109,3 +111,6 @@ class physical_layer_driver(gr.hier_block2):
 
     def get_mode(self):
         return self._physical_layer_driver_description.get_mode()
+
+    def get_doppler(self):
+        return '%+4.1f Hz' % (self._msg_proxy.get_doppler()*self._samp_rate/(2*math.pi))

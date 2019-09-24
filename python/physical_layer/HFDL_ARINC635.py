@@ -105,6 +105,7 @@ class PhysicalLayer(object):
         self._viterbi_dec = viterbi27(0x6d, 0x4f)
         self._repeat      = 1
         self._mode_descr  = 'UNKNOWN'
+        self._fault_counter = 0
 
     def get_constellations(self):
         return self._constellations
@@ -121,6 +122,7 @@ class PhysicalLayer(object):
         success = True
         if len(symbols) == 0:
             self._frame_counter = -1
+            self._fault_counter = 0
             s = self.get_preamble()
             s.resize(15+len(s))
             s['scramble'][-15:] = 1
@@ -177,12 +179,20 @@ class PhysicalLayer(object):
         tests = [np.abs(mean_s) > 0.4,
                  np.real(mean_s) > np.imag(mean_s)]
         print('FRAME_QUALITY: ', s, mean_s, tests)
-        success = all(tests)
+        if all(tests):
+            self._fault_counter -= 1
+        else:
+            self._fault_counter += 1
+        self._fault_counter = min(11, max(0, self._fault_counter))
+        success = self._fault_counter < 10
+        if not success:
+            self._fault_counter = 0
         return success
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
         r = {'success': False, ## -- quality flag
+             'use_amp_est': self._frame_counter < 0,
              'doppler': 0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) != 0:
             sps  = self._sps
@@ -215,10 +225,11 @@ class PhysicalLayer(object):
         tt[0] = np.abs(np.vdot(t, self._preamble['symb'][0:15]))
         for i in range(1,len(tt)):
             tt[i] = np.abs(np.vdot(t, np.roll(M1, -SHIFTS[i-1])[0:15]))
-        print('XXX ', tt)
-        ii = np.argmax(tt)
-        ## TODO: add a meaningful QA test
-        return True,ii
+        imax = np.argmax(tt)
+        test = tt[imax] / (np.sum(tt) - tt[imax]) * len(MODES)
+        success = test > 3
+        print('XXX ', test, tt)
+        return success,imax
 
     def set_mode(self, _):
         pass

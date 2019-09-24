@@ -34,6 +34,7 @@ class msg_proxy(gr.basic_block):
                                 out_sig=[])
         self._obj = physical_layer_object
         self._quality = 0.0
+        self._doppler = 0.0
 
         self._port_doppler = pmt.intern("doppler")
         self.message_port_register_in(self._port_doppler)
@@ -54,8 +55,9 @@ class msg_proxy(gr.basic_block):
     def msg_handler_doppler(self, msg_in):
         ## print('-------------------- msg_handler_doppler --------------------')
         iq_samples = pmt.to_python(pmt.cdr(msg_in))
-        msg_out    = pmt.to_pmt(self._obj.get_doppler(iq_samples))
-        self.message_port_pub(self._port_doppler, msg_out)
+        doppler = self._obj.get_doppler(iq_samples)
+        self._doppler = doppler['doppler']
+        self.message_port_pub(self._port_doppler, pmt.to_pmt(doppler))
 
     def msg_handler_frame(self, msg_in):
         ## print('-------------------- msg_handler_frame --------------------')
@@ -82,3 +84,6 @@ class msg_proxy(gr.basic_block):
 
     def get_quality(self):
         return ('%5.1f %%' % self._quality)
+
+    def get_doppler(self):
+        return self._doppler

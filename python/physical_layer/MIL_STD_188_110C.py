@@ -309,6 +309,7 @@ class PhysicalLayer(object):
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
         r = {'success': False, ## -- quality flag
+             'use_amp_est': self._frame_counter < 0,
              'doppler': 0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) != 0:
             sps  = self._sps
