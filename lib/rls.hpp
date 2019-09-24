@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "filter_update.hpp"
-#include "volk_allocator.hpp"
+#include "volk_alloc.h"
 
 
 namespace gr {
@@ -28,7 +28,7 @@ protected:
 private:
   rls(float delta, float lambda);
 
-  typedef std::vector<gr_complex, volk_allocator<gr_complex> > vec_type;
+  typedef volk::vector<gr_complex> vec_type;
   float    _delta;
   float    _lambda;
   vec_type _gain;

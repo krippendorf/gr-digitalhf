@@ -44,7 +44,7 @@ gr_complex const* nlms::update(gr_complex const* beg,
   volk_32fc_magnitude_squared_32f(&_t1[0], beg, n);
   float norm = _delta;
   volk_32f_accumulator_s32f(&norm, &_t1[0], n);
-  volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], std::max(0.006f, _mu/norm), 2*n);
+  volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], std::max(0.005f, _mu/norm), 2*n);
 
   return &_gain.front();
 }

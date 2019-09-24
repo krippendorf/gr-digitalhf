@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "filter_update.hpp"
-#include "volk_allocator.hpp"
+#include "volk_alloc.h"
 
 // see
 // [1] https://open.library.ubc.ca/collections/ubctheses/831/items/1.0096286
@@ -30,7 +30,7 @@ protected:
 private:
   kalman_exp(float r, float lambda);
 
-  typedef std::vector<gr_complex, volk_allocator<gr_complex> > vec_type;
+  typedef volk::vector<gr_complex> vec_type;
   float    _lambda;
   float    _r;
   vec_type _gain;

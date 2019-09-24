@@ -27,7 +27,7 @@
 #include <digitalhf/adaptive_dfe.h>
 
 #include "filter_update.hpp"
-#include "volk_allocator.hpp"
+#include "volk_alloc.h"
 
 namespace gr {
 namespace digitalhf {
@@ -59,7 +59,7 @@ private:
 
 class adaptive_dfe_impl : public adaptive_dfe {
 private:
-  typedef std::vector<gr_complex, volk_allocator<gr_complex> > gr_complex_vec_type;
+  typedef volk::vector<gr_complex> gr_complex_vec_type;
 
   int _sps;
   int _nB, _nF, _nW;
