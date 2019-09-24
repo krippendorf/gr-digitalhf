@@ -43,8 +43,9 @@ private:
   pmt::pmt_t _msg_metadata;
   pmt::pmt_t _port_name;
 
-  float _phase_est;
-
+  float _phase_est;     // phase from correlation
+  float _amp_est_saved; // new amplitude correction
+  float _amp_est;       // currenlty applied amplitude correction
 public:
   doppler_correction_cc_impl(unsigned int preamble_length, unsigned int preamble_length_cc);
   virtual ~doppler_correction_cc_impl();

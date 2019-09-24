@@ -52,7 +52,9 @@ doppler_correction_cc_impl::doppler_correction_cc_impl(unsigned int preamble_len
   , _state(WAIT_FOR_PHASE_EST_TAG)
   , _msg_metadata(pmt::make_dict())
   , _port_name(pmt::intern("doppler"))
-  , _phase_est(0)
+  , _phase_est(0.0f)
+  , _amp_est_saved(1.0f)
+  , _amp_est(1.0f)
 {
   GR_LOG_DECLARE_LOGPTR(d_logger);
   GR_LOG_ASSIGN_LOGPTR(d_logger, "doppler_correction_cc");
@@ -71,6 +73,7 @@ void
 doppler_correction_cc_impl::handle_message(pmt::pmt_t msg)
 {
   gr::thread::scoped_lock lock(d_setlock);
+
   bool const success = pmt::to_bool(pmt::dict_ref(msg, pmt::intern("success"), pmt::get_PMT_F()));
   if (!success) {
     // GR_LOG_DEBUG(d_logger, "next state > CONSUME_AND_SKIP success=false");
@@ -78,6 +81,11 @@ doppler_correction_cc_impl::handle_message(pmt::pmt_t msg)
       _state = CONSUME_AND_SKIP;
     return;
   }
+
+  bool const use_amp_est = pmt::to_bool(pmt::dict_ref(msg, pmt::intern("use_amp_est"), pmt::get_PMT_T()));
+  if (use_amp_est)
+    _amp_est = _amp_est_saved;
+
   float const doppler = pmt::to_float(pmt::dict_ref(msg, pmt::intern("doppler"), pmt::from_float(0)));
   _rotator.set_phase_incr(gr_expj(-doppler));
   if (_state == WAIT_FOR_MSG) {
@@ -112,16 +120,18 @@ doppler_correction_cc_impl::work(int noutput_items,
   int nout = 0;
   switch (_state) {
     case WAIT_FOR_PHASE_EST_TAG: {
-      std::vector<tag_t> v;
-      get_tags_in_window(v, 0, 0, noutput_items, pmt::intern("phase_est"));
-      if (v.empty()) {
+      std::vector<tag_t> v_phase, v_amp;
+      get_tags_in_window(v_phase, 0, 0, noutput_items, pmt::intern("phase_est"));
+      get_tags_in_window(v_amp, 0, 0, noutput_items, pmt::intern("amp_est"));
+      if (v_phase.empty()) {
         nout = noutput_items;
       } else {
-        tag_t const& tag = v.front();
-        uint64_t const offset = tag.offset - nitems_read(0);
-        nout = offset;
-        _phase_est = pmt::to_double(tag.value);
-        _msg_metadata = pmt::dict_add(_msg_metadata, pmt::intern("packet_len"), pmt::from_long(_preamble_length));
+        tag_t const& tag_phase = v_phase.front();
+        tag_t const& tag_amp   = v_amp.front();
+        uint64_t const offset  = nout = tag_phase.offset - nitems_read(0);
+        _phase_est     = pmt::to_double(tag_phase.value);
+        _amp_est_saved = pmt::to_double(tag_amp.value);
+        _msg_metadata  = pmt::dict_add(_msg_metadata, pmt::intern("packet_len"), pmt::from_long(_preamble_length));
         message_port_pub(_port_name,
                          pmt::cons(_msg_metadata,
                                    pmt::init_c32vector(_preamble_length, in+nout)));
@@ -156,6 +166,9 @@ doppler_correction_cc_impl::work(int noutput_items,
   for (int i=0; i<nout; ++i)
     out[i] = _rotator.rotate(in[i]);
 #endif
+  volk_32f_s32f_multiply_32f(reinterpret_cast<float*>(out),
+                             reinterpret_cast<float const*>(out),
+                             _amp_est, 2*nout);
   // Tell runtime system how many output items we produced.
   return nout;
 }
