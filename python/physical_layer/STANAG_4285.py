@@ -8,31 +8,41 @@ from digitalhf.digitalhf_swig import viterbi27
 class Deinterleaver(object):
     "S4285 deinterleaver"
     def __init__(self, incr):
+        self._dtype = np.float32
         ## incr = 12 -> L
         ## incr =  1 -> S
-        self._buf = [np.zeros(incr*(31-i) + 1) for i in range(32)]
+        self._buf = [np.zeros(incr*(31-i) + 1, dtype=self._dtype)
+                     for i in range(32)]
 
     def push(self, a):
         assert(len(a) == 32)
         for i in range(32):
             self._buf[i][0] = a[i]
             self._buf[i] = np.roll(self._buf[i],1)
+        return self.fetch()
 
     def fetch(self):
-        return np.array([self._buf[(9*i)%32][0] for i in range(32)])
+        return np.array([self._buf[(9*i)%32][0] for i in range(32)],
+                        dtype=self._dtype)
 
 
+## ---- constellatios -----------------------------------------------------------
+BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), common.CONST_DTYPE)
+QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), common.CONST_DTYPE)
+PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,6,7,5,4]), common.CONST_DTYPE)
+
+## ---- constellation indices ---------------------------------------------------
 MODE_BPSK=0
 MODE_QPSK=1
 MODE_8PSK=2
 
 MODES = { ## [BPS]['const'] [BPS]['punct'] [BPS]['repeat']
-    '2400': {'const': MODE_8PSK, 'punct': ['11', '10'] , 'repeat': 1, 'deintl_multiple': 4},
-    '1200': {'const': MODE_QPSK, 'punct': [ '1',  '1'] , 'repeat': 1, 'deintl_multiple': 2},
-     '600': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 1, 'deintl_multiple': 1},
-     '300': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 2, 'deintl_multiple': 1},
-     '150': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 4, 'deintl_multiple': 1},
-      '75': {'const': MODE_BPSK, 'punct': [ '1',  '1'] , 'repeat': 8, 'deintl_multiple': 1}
+    '2400': {'const': MODE_8PSK, 'repeat': 1, 'deintl_multiple': 4},
+    '1200': {'const': MODE_QPSK, 'repeat': 1, 'deintl_multiple': 2},
+     '600': {'const': MODE_BPSK, 'repeat': 1, 'deintl_multiple': 1},
+     '300': {'const': MODE_BPSK, 'repeat': 2, 'deintl_multiple': 1},
+     '150': {'const': MODE_BPSK, 'repeat': 4, 'deintl_multiple': 1},
+      '75': {'const': MODE_BPSK, 'repeat': 8, 'deintl_multiple': 1}
 }
 
 DEINTERLEAVER_INCR = { 'S': 1, 'L': 12 }
@@ -45,9 +55,7 @@ class PhysicalLayer(object):
         self._sps     = sps
         self._frame_counter = 0
         self._is_first_frame = True
-        self._constellations = [self.make_psk(2, [0,1]),
-                                self.make_psk(4, [0,1,3,2]),
-                                self.make_psk(8, [1,0,2,3,6,7,5,4])]
+        self._constellations = [BPSK,QPSK,PSK8]
         self._preamble = self.get_preamble()
         self._data     = self.get_data()
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
@@ -61,8 +69,8 @@ class PhysicalLayer(object):
         bps,intl = mode.split('/')
         self._mode          = MODES[bps]['const']
         self._deinterleaver = Deinterleaver(DEINTERLEAVER_INCR[intl] * MODES[bps]['deintl_multiple'])
-        self._depuncturer   = common.Depuncturer(repeat           = MODES[bps]['repeat'],
-                                                 puncture_pattern = MODES[bps]['punct'])
+        self._depuncturer   = common.Depuncturer(repeat = MODES[bps]['repeat'])
+        self._repeat        = MODES[bps]['repeat']
         self._fault_counter = 0
 
     def get_mode(self):
@@ -128,14 +136,34 @@ class PhysicalLayer(object):
 
     def decode_soft_dec(self, soft_dec):
         n = len(soft_dec)
-        r = []
-        for i in range(0,n,32):
-            self._deinterleaver.push(soft_dec[i:i+32])
-            r.extend(self._deinterleaver.fetch().tolist())
-        rd = self._depuncturer.process(np.array(r, dtype=np.float32))
-        decoded_bits = self._viterbi_decoder.udpate(rd)
-        quality      = 100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))
+        quality_correction = 4.0/3.5 if n==384 else 1.0
+        deintl = lambda x: np.concatenate([self._deinterleaver.push(x[i:i+32]) for i in range(0,len(x),32)])
+        rd = self._derepeat(deintl(self._depuncture(soft_dec)))
+        decoded_bits = self._viterbi_decoder.udpate(rd.tolist())
+        quality      = 100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))*quality_correction
         return decoded_bits,quality
+
+    def _derepeat(self, soft_dec):
+        if self._repeat == 1:
+            return soft_dec
+        n = len(soft_dec)
+        m = n//(2*self._repeat)
+        u = soft_dec.reshape(m, 2*self._repeat)
+        for i in range(1,self._repeat):
+            u[:,0] += u[:,2*i]
+            u[:,1] += u[:,2*i+1]
+        return np.reshape(u[:,0:2], 2*m)
+
+    def _depuncture(self, soft_dec):
+        if len(soft_dec) != 384:
+            return soft_dec
+        else:
+            u = np.zeros(512, dtype=soft_dec.dtype)
+            u[0::4] = soft_dec[0::3]
+            u[1::4] = soft_dec[1::3]
+            u[2::4] = soft_dec[2::3]
+            u[3::4] = 0.0 ## puncture
+            return u
 
     @staticmethod
     def get_preamble():
