@@ -32,7 +32,7 @@ public:
     : _table() {
     for (int i=0; i<N; ++i) { // llr -> probability(1)
       float const x = -7.0f + 14.0f*float(i)/float(N-1);
-      _table[i] = std::uint8_t(0.5f + 255.0f/(1.0f + std::exp(x)));
+      _table[i] = std::uint8_t(0.5f + 255.0f/(1.0f + std::exp(-x)));
     }
   }
   virtual ~llr_to_prob() {}
