@@ -248,7 +248,10 @@ class PhysicalLayer(object):
         decoded_bits = self._viterbi_dec.udpate(rd)
         quality      = 100.0*self._viterbi_dec.quality()/(2*len(decoded_bits))
         print('qyality= ', quality, ' bits=', decoded_bits)
-        return decoded_bits,quality
+        if quality > 99.0:
+            return np.packbits(decoded_bits),quality
+        else:
+            return [],quality
 
     @staticmethod
     def get_preamble():
