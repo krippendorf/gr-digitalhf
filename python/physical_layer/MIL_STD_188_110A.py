@@ -222,8 +222,9 @@ class PhysicalLayer(object):
 
     def get_doppler(self, iq_samples):
         """quality check and doppler estimation for preamble"""
-        r = {'success': False, ## -- quality flag
-             'doppler': 0}     ## -- doppler estimate (rad/symb)
+        r = {'success':     False, ## -- quality flag
+             'use_amp_est': self._frame_counter < 0,
+             'doppler':     0}     ## -- doppler estimate (rad/symb)
         if len(iq_samples) != 0:
             sps  = self._sps
             zp   = np.array([z for z in PhysicalLayer.get_preamble()['symb']
@@ -269,9 +270,10 @@ class PhysicalLayer(object):
         self._deinterleaver = Deinterleaver(mode['interleaver'][1], mode['interleaver'][2])
         self._depuncturer   = common.Depuncturer(repeat=mode['repeat'])
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
-        self._mode_description = 'MIL_STD_188-110A: %dbps intl=%s [U=%d,K=%d]' % (mode['bit_rate'],
-                                                                                  mode['interleaver'][0],
-                                                                                  mode['unknown'], mode['known'])
+        self._mode_description = 'MIL_STD_188-110A: (%d,%d) %dbps intl=%s [U=%d,K=%d]' % (data[9],data[10],
+                                                                                          mode['bit_rate'],
+                                                                                          mode['interleaver'][0],
+                                                                                          mode['unknown'], mode['known'])
         print(self._d1d2, mode, self._frame_len, self._mode_description)
         return True
 
