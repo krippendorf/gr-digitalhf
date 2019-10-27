@@ -63,7 +63,7 @@ gr_complex const* rls::update(gr_complex const* beg,
     volk_32f_s32f_multiply_32f((float*)&_inv_corr[k], (float const*)&_inv_corr[k], 1.0f/_lambda, 2*n);
   }
 
-  return &_gain.front();
+  return _gain.data();
 }
 
 void rls::set_parameters(std::map<std::string, float> const& p) {

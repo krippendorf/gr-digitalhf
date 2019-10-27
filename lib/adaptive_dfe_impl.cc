@@ -208,9 +208,9 @@ adaptive_dfe_impl::general_work(int noutput_items,
 #endif
         }
         assert(i+_nF < nin && i-1-_nB >= 0);
-        out_symb[nout] = filter(&_rotated_samples.front() + i - _nB,
-                                &_rotated_samples.front() + i + _nF+1);
-        std::memcpy(&out_taps[(_nB+_nF+1)*nout], &_taps_samples.front(), (_nB+_nF+1)*sizeof(gr_complex));
+        out_symb[nout] = filter(_rotated_samples.data() + i - _nB,
+                                _rotated_samples.data() + i + _nF+1);
+        std::memcpy(&out_taps[(_nB+_nF+1)*nout], _taps_samples.data(), (_nB+_nF+1)*sizeof(gr_complex));
         ++nout;
       } // next sample
       consume(0, ninput_processed);
@@ -254,7 +254,7 @@ gr_complex adaptive_dfe_impl::filter(gr_complex const* start, gr_complex const* 
   // (1a) taps_samples
   volk_32fc_x2_dot_prod_32fc(&filter_output,
                              start,
-                             &_taps_samples.front(),
+                             _taps_samples.data(),
                              _nB+_nF+1);
   // (1b) taps_symbols
   gr_complex dot_symbols(0);

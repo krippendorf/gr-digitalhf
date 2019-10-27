@@ -16,6 +16,7 @@ namespace digitalhf {
 class filter_update : private boost::noncopyable {
 public:
   typedef std::unique_ptr<filter_update> sptr;
+  virtual ~filter_update() {}
 
   virtual void reset() = 0;
   virtual gr_complex const* update(gr_complex const*, gr_complex const*) = 0;

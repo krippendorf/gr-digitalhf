@@ -40,7 +40,7 @@ gr_complex const* lms::update(gr_complex const* beg,
   volk_32fc_conjugate_32fc(&_tmp[0], beg, n);
   volk_32f_s32f_multiply_32f((float*)&_gain[0], (float const*)&_tmp[0], _mu, 2*n);
 
-  return &_gain.front();
+  return _gain.data();
 }
 
 void lms::set_parameters(std::map<std::string, float>const & p) {
