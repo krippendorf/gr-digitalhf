@@ -39,6 +39,7 @@ GR_PYTHON_INSTALL(
     MIL_STD_188_110D.py
     STANAG_5511.py
     HFDL_ARINC635.py
+    STANAG_4539_AppD.py
     DESTINATION ${GR_PYTHON_DIR}/digitalhf/physical_layer
 )
 

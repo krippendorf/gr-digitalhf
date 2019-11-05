@@ -6,14 +6,13 @@ import common
 
 from digitalhf.digitalhf_swig import viterbi27
 
-## 192 = 6*32
-PREAMBLE=np.array([7,0,3,4,1,1,1,0,2,6,1,5,1,7,0,3,5,4,2,2,6,1,2,2,0,4,5,4,1,2,2,6,
-                   7,0,7,0,1,1,5,4,2,6,5,1,1,7,4,7,5,4,6,6,6,1,6,6,0,4,1,0,1,2,6,2,
-                   7,4,7,4,1,5,5,0,2,2,5,5,1,3,4,3,5,0,6,2,6,5,6,2,0,0,1,4,1,6,6,6,
-                   7,0,3,4,5,5,5,4,2,6,1,5,5,3,4,7,5,4,2,2,2,5,6,6,0,4,5,4,5,6,6,2,
-                   7,4,3,0,1,5,1,4,2,2,1,1,1,3,0,7,5,0,2,6,6,5,2,6,0,0,5,0,1,6,2,2,
-                   7,4,3,0,5,1,5,0,2,2,1,1,5,7,4,3,5,0,2,6,2,1,6,2,0,0,5,0,5,2,6,6],
-                  dtype=np.uint8)
+## 192 = 6*32                        0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1 # 32
+PREAMBLE = common.n_psk(8, np.array([7,0,3,4,1,1,1,0,2,6,1,5,1,7,0,3,5,4,2,2,6,1,2,2,0,4,5,4,1,2,2,6,   # 1
+                                     7,0,7,0,1,1,5,4,2,6,5,1,1,7,4,7,5,4,6,6,6,1,6,6,0,4,1,0,1,2,6,2,   # 2
+                                     7,4,7,4,1,5,5,0,2,2,5,5,1,3,4,3,5,0,6,2,6,5,6,2,0,0,1,4,1,6,6,6,   # 3
+                                     7,0,3,4,5,5,5,4,2,6,1,5,5,3,4,7,5,4,2,2,2,5,6,6,0,4,5,4,5,6,6,2,   # 4
+                                     7,4,3,0,1,5,1,4,2,2,1,1,1,3,0,7,5,0,2,6,6,5,2,6,0,0,5,0,1,6,2,2,   # 5
+                                     7,4,3,0,5,1,5,0,2,2,1,1,5,7,4,3,5,0,2,6,2,1,6,2,0,0,5,0,5,2,6,6])) # 6
 
 ## ---- data scrambler -----------------------------------------------------------
 class ScrambleData(object):
@@ -101,20 +100,23 @@ class PhysicalLayer(object):
         [1] ... doppler estimate (rad/symbol) if available"""
         print('-------------------- get_doppler --------------------',
               self._frame_counter,len(iq_samples))
+        r = {'success':     False, ## -- quality flag
+             'use_amp_est': False, ##self._frame_counter < 0,
+             'doppler':     0}     ## -- doppler estimate (rad/symb)
         sps  = self._sps
         _,zp = self.get_preamble_z()
         wlen = 32
-        cc   = np.correlate(iq_samples, zp)
+        cc   = np.correlate(iq_samples, zp[0:wlen])
         imax = np.argmax(np.abs(cc[0:wlen*sps]))
         idx  = np.arange(wlen*sps)
-        pks  = [np.correlate(iq_samples[imax+i*wlen*sps+idx],
-                             zp[i*wlen*sps+idx])[0]
+        pks  = [np.vdot(zp[             i*wlen*sps+idx],
+                        iq_samples[imax+i*wlen*sps+idx])
                 for i in range((len(iq_samples)-imax) // (wlen*sps))]
         print('get_doppler pks: ', pks, np.angle(pks))
-        doppler = common.freq_est(pks)/(wlen*sps)
-        print('get_doppler doppler: ', doppler)
-        success = True
-        return success,0*doppler
+        r['doppler'] = common.freq_est(pks)/(wlen*sps)
+        print('get_doppler doppler: ', r['doppler'])
+        r['success'] = True
+        return r
 
     def set_mode(self, mode):
         pass
@@ -125,14 +127,16 @@ class PhysicalLayer(object):
         deintl_soft_dec = np.zeros(90, dtype=np.float64)
         deintl_soft_dec[self._intl_idx] = soft_dec
         print('decode_soft_dec', deintl_soft_dec)
+        decoded_bits = []
+        quality = 0.0
         if self._frame_counter == 2:
             self._viterbi_decoder.reset()
             decoded_bits = self._viterbi_decoder.udpate(deintl_soft_dec)
-            print('bits=', decoded_bits)
-            print('quality={}% ({},{})'.format(100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits)),
+            quality = 100.0*self._viterbi_decoder.quality()/(2*len(decoded_bits))
+            print('bits=', len(decoded_bits), decoded_bits)
+            print('quality={}% ({},{})'.format(quality,
                                                self._viterbi_decoder.quality(),
                                                len(decoded_bits)))
-            return decoded_bits
         else:
             depunct_deintl_soft_dec = np.zeros(90//3*4, dtype=np.float64)
             depunct_deintl_soft_dec[0::4] = deintl_soft_dec[0::3]
@@ -141,19 +145,20 @@ class PhysicalLayer(object):
             depunct_deintl_soft_dec[3::4] = 0
             self._viterbi_decoder2.reset()
             decoded_bits = self._viterbi_decoder2.udpate(depunct_deintl_soft_dec)
-            print('bits=', decoded_bits)
-            print('quality={}% ({},{})'.format(100.0*4/3.5*self._viterbi_decoder2.quality()/(2*len(decoded_bits)),
+            quality = 100.0*4/3.5*self._viterbi_decoder2.quality()/(2*len(decoded_bits))
+            print('bits=', len(decoded_bits), decoded_bits)
+            print('quality={}% ({},{})'.format(quality,
                                                self._viterbi_decoder2.quality(),
                                                len(decoded_bits)))
-            return decoded_bits
+        if quality > 90:
+            return decoded_bits,quality
+        else:
+            return [],0.0
 
 
     def get_preamble(self):
         """preamble symbols + scrambler"""
-        a = np.zeros(len(PREAMBLE), dtype=common.SYMB_SCRAMBLE_DTYPE)
-        a['symb']     = common.n_psk(8, PREAMBLE)
-        a['scramble'] = common.n_psk(8, PREAMBLE)
-        return a
+        return common.make_scr(PREAMBLE,PREAMBLE)
 
     def get_preamble_z(self):
         """preamble symbols for preamble correlation"""

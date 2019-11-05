@@ -241,8 +241,8 @@ class PhysicalLayer(object):
             r['success'] = np.bool(np.mean(apks) > 5*np.mean(tpks) and apks[0]/apks[1] > 0.5 and apks[0]/apks[1] < 2.0)
             if r['success']:
                 idx = np.arange(32*sps)
-                pks = [np.correlate(iq_samples[imax+i*32*sps+idx],
-                                    zp[             i*32*sps+idx])[0]
+                pks = [np.vdot(zp[             i*32*sps+idx],
+                               iq_samples[imax+i*32*sps+idx])
                        for i in range(9)]
                 r['doppler'] = common.freq_est(pks)/(32*sps)
                 print('success=', r['success'], 'doppler=', r['doppler'],
@@ -259,7 +259,9 @@ class PhysicalLayer(object):
         print('data=',data)
         self._pre_counter = sum([(x&3)*(1<<2*y) for (x,y) in zip(data[11:14][::-1], range(3))])
         self._d1d2 = data[9:11]
-        print('MODE:', data[9:11])
+        print('MODE:', data[9:11], 'pre_counter=', self._pre_counter)
+        data[9]=5
+        data[10]=5
         self._mode = mode = MODE[data[9]][data[10]]
         self._block_len = 11520 if mode['interleaver'][0] == 'L' else 1440
         self._frame_len = mode['known'] + mode['unknown']
