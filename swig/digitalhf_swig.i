@@ -10,6 +10,7 @@
 %{
 #include "digitalhf/adaptive_dfe.h"
 #include "digitalhf/doppler_correction_cc.h"
+#include "digitalhf/oqpsk_demodulator.h"
 #include "digitalhf/viterbi27.h"
 #include "digitalhf/viterbi29.h"
 #include "digitalhf/viterbi39.h"
@@ -26,6 +27,9 @@ GR_SWIG_BLOCK_MAGIC2(digitalhf, doppler_correction_cc);
 
 %include "digitalhf/vector_pll_cc.h"
 GR_SWIG_BLOCK_MAGIC2(digitalhf, vector_pll_cc);
+
+%include "digitalhf/oqpsk_demodulator.h"
+GR_SWIG_BLOCK_MAGIC2(digitalhf, oqpsk_demodulator);
 
 %include "digitalhf/vector_early_late_cc.h"
 GR_SWIG_BLOCK_MAGIC2(digitalhf, vector_early_late_cc);

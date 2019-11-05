@@ -29,6 +29,7 @@ install(FILES
     viterbi29.h
     viterbi39.h
     viterbi48.h
+    oqpsk_demodulator.h
     vector_pll_cc.h
     DESTINATION include/digitalhf
 )

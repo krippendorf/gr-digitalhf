@@ -22,5 +22,6 @@ install(FILES
     digitalhf_physical_layer_driver.xml
     digitalhf_doppler_correction_cc.xml
     digitalhf_cis_12_channelizer.xml
+    digitalhf_oqpsk_demodulator.xml
     digitalhf_msg_proxy.xml DESTINATION share/gnuradio/grc/blocks
 )

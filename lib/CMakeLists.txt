@@ -32,6 +32,7 @@ list(APPEND digitalhf_sources
     viterbi29_impl.cc
     viterbi39_impl.cc
     viterbi48_impl.cc
+    oqpsk_demodulator_impl.cc
     vector_pll_cc_impl.cc
     vector_early_late_cc_impl.cc
     lms.cc

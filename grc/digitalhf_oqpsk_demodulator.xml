@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<block>
+  <name>oqpsk_demodulator</name>
+  <key>digitalhf_oqpsk_demodulator</key>
+  <category>[digitalhf]</category>
+  <import>import digitalhf</import>
+  <make>digitalhf.oqpsk_demodulator($fs, $fd, $loop_bw, $df)</make>
+  <param>
+    <name>fs (Hz)</name>
+    <key>fs</key>
+    <type>float</type>
+  </param>
+  <param>
+    <name>fd (Hz)</name>
+    <key>fd</key>
+    <type>float</type>
+  </param>
+  <param>
+    <name>loop_bw</name>
+    <key>loop_bw</key>
+    <type>float</type>
+  </param>
+  <param>
+    <name>df (Hz)</name>
+    <key>df</key>
+    <type>float</type>
+  </param>
+  <sink>
+    <name>in</name>
+    <type>complex</type>
+  </sink>
+  <source>
+    <name>soft_dec_x</name>
+    <type>float</type>
+  </source>
+  <source>
+    <name>soft_dec_y</name>
+    <type>float</type>
+  </source>
+</block>
