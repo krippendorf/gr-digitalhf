@@ -14,15 +14,12 @@ parameters:
 -   id: sps
     label: SPS
     dtype: int
-    hide: ${ 'part' if vlen == 1 else 'none' }
 -   id: nB
     label: nB
     dtype: int
-    hide: ${ 'part' if vlen == 1 else 'none' }
 -   id: nF
     label: nF
     dtype: int
-    hide: ${ 'part' if vlen == 1 else 'none' }
 -   id: nW
     label: nW
     dtype: int
