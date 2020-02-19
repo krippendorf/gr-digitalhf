@@ -63,7 +63,7 @@ class physical_layer_driver(gr.hier_block2):
                                                        sps        = sps,
                                                        mark_delay = preamble_offset,
                                                        threshold  = 1-math.exp(-8),
-                                                       threshold_method = 0)
+                                                       threshold_method = digital.THRESHOLD_DYNAMIC)
         self._doppler_correction = digitalhf.doppler_correction_cc(preamble_length, len(preamble_samples))
         self._adaptive_filter    = digitalhf.adaptive_dfe(sps, nB, nF, nW, mu, alpha)
         self._msg_proxy          = digitalhf.msg_proxy(self._physical_layer_driver_description)
