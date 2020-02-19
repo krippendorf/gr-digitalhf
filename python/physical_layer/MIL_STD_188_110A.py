@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 import numpy as np
-import common
+from . import common
 from digitalhf.digitalhf_swig import viterbi27
 
 ## ---- Walsh-8 codes -----------------------------------------------------------
@@ -76,9 +76,9 @@ class ScrambleData(object):
         return self._state
 
 ## ---- constellatios -----------------------------------------------------------
-BPSK=np.array(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1]), common.CONST_DTYPE)
-QPSK=np.array(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2]), common.CONST_DTYPE)
-PSK8=np.array(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,6,7,5,4]), common.CONST_DTYPE)
+BPSK=np.array(list(zip(np.exp(2j*np.pi*np.arange(2)/2), [0,1])), common.CONST_DTYPE)
+QPSK=np.array(list(zip(np.exp(2j*np.pi*np.arange(4)/4), [0,1,3,2])), common.CONST_DTYPE)
+PSK8=np.array(list(zip(np.exp(2j*np.pi*np.arange(8)/8), [0,1,3,2,6,7,5,4])), common.CONST_DTYPE)
 
 ## ---- constellation indices ---------------------------------------------------
 MODE_BPSK=0

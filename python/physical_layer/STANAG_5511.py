@@ -2,7 +2,7 @@
 
 from __future__ import print_function
 import numpy as np
-import common
+from . import common
 
 from digitalhf.digitalhf_swig import viterbi27
 
