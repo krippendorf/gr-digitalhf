@@ -154,14 +154,14 @@ TO_RATE={(0,0,0): {'baud': '--------', 'bits_per_symbol': 0},  ## reserved
          (1,1,1): {'baud':     'HFXL', 'bits_per_symbol': 0}}  ## reserved - used by THALES HFXL
 
 ## ---- interleaver ------------------------------------------------------------
-TO_INTERLEAVER={(0,0,0): {'frames': -1, 'id': '--', 'name': 'illegal'},
+TO_INTERLEAVER={(0,0,0): {'frames': -1, 'id': '-0', 'name': 'illegal'},
                 (0,0,1): {'frames':  1, 'id': 'US', 'name': 'Ultra Short'},
                 (0,1,0): {'frames':  3, 'id': 'VS', 'name': 'Very Short'},
                 (0,1,1): {'frames':  9, 'id':  'S', 'name': 'Short'},
                 (1,0,0): {'frames': 18, 'id':  'M', 'name': 'Medium'},
                 (1,0,1): {'frames': 36, 'id':  'L', 'name': 'Long'},
                 (1,1,0): {'frames': 72, 'id': 'VL', 'name': 'Very Long'},
-                (1,1,1): {'frames': -1, 'id': '--', 'name': 'illegal'}}
+                (1,1,1): {'frames': -1, 'id': '-1', 'name': 'illegal'}}
 
 MP_COUNTER=[(0,0,1), ## 1st
             (0,1,0), ## 2nd
@@ -267,6 +267,7 @@ class PhysicalLayer(object):
         self._scramble = ScrambleData()
         self._viterbi_decoder = viterbi27(0x6d, 0x4f)
         self._mode_description = 'UNKNOWN'
+        self._msg_counter = 0
 
     def get_constellations(self):
         return self._constellations
@@ -281,6 +282,7 @@ class PhysicalLayer(object):
         print('-------------------- get_frame --------------------', self._frame_counter)
         success = True
         if self._frame_counter == -2: ## ---- preamble
+            self._msg_counter += 1
             self._deintl_depunct = None
             self._mode = {}
             self._preamble_offset = 0
@@ -526,7 +528,11 @@ class PhysicalLayer(object):
             return soft_bits>0,100.0
         elif self.is_HFXL():
             ## TODO
-            return np.zeros(0, dtype=np.float32),0.0
+            with open('bits_%03d.txt' % self._msg_counter, 'a') as f:
+                tmp=soft_dec>0
+                for t in tmp:
+                    f.write('%d' % t)
+            return soft_dec>0,0.0 ##np.zeros(0, dtype=np.float32),0.0
 
         elif self.is_plain_110C():
             r = self._deintl_depunct.load(soft_dec)
