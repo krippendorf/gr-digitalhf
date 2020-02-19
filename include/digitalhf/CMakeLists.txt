@@ -31,5 +31,6 @@ install(FILES
     viterbi48.h
     oqpsk_demodulator.h
     vector_pll_cc.h
+    vector_early_late_cc.h 
     DESTINATION include/digitalhf
 )
